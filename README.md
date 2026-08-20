@@ -662,7 +662,7 @@ MIT License
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.com/#ttguy0707/CyberClaw&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)
 
 ---
 
@@ -1313,7 +1313,7 @@ MIT License
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.com/#ttguy0707/CyberClaw&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)
 
 ---
 
