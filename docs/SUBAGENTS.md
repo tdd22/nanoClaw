@@ -4,7 +4,7 @@ CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。
 
 ## CLI 用法
 
-更新源码并重启 cyberclaw run。默认注册两种角色：
+更新源码并重启 cyberclaw run。默认提供两种预设角色，主 Agent 也可以临时定义其他角色：
 
 | 名称 | 作用 | 默认工具 |
 | --- | --- | --- |
@@ -21,10 +21,49 @@ CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。
 
 路径相对于 office。默认角色没有写文件、Shell、画像或任务调度工具，也不会自动获得所有动态技能。它们生成建议和草稿，不能宣称已修改文件。工具列表来自可信的宿主配置；模型不能通过参数增加权限。
 
+## 主 Agent 按任务自定义角色
+
+主 Agent 不必局限于上述预设。delegate_task 支持以下调用形态：
+
+~~~json
+{
+  "agent_name": "test_designer",
+  "instructions": "你负责测试设计。识别异常路径，给出输入、预期结果及断言依据。",
+  "tool_names": ["read_office_file"],
+  "task": "为 project/agent.py 设计关键回归用例",
+  "context": "只分析和提出测试方案，不修改文件。"
+}
+~~~
+
+其中 agent_name 是本次临时角色的 ASCII 标识，instructions 定义职责、方法和输出要求，task 是具体工作，context 是必要背景。主 Agent 自行选择这些字段，不要求用户预先注册角色。
+
+- 新角色必须提供非空 instructions，最多 4000 字符。
+- tool_names 只允许从宿主公开的清单中选取，默认可选 list_office_files、read_office_file；空列表表示不绑定任何工具。
+- 未授权工具在创建子图/模型之前拒绝，不能通过提示词增加权限。动态工具清单独立于预设专家的工具集合，不自动继承其高权限工具。
+- 已存在的预设角色仍按原方式调用，instructions 与 tool_names 留空；不能借自定义接口修改预设的提示词或工具。
+- 临时定义仅用于当前调用，不写入注册表；并发使用同一新名称也拥有独立定义和消息状态。
+- 动态角色沿用主 app 的模型选择，模型/API 地址和执行预算不暴露给模型填写。
+- 预设和临时角色共用并发准入、超时、步数及返回长度限制，均不能继续委派。
+
+SDK 宿主可控制这项能力：
+
+~~~python
+from cyberclaw.core.agent import create_agent_app
+from cyberclaw.core.tools.sandbox_tools import read_office_file
+
+# 保留预设角色，但关闭主 Agent 临时定义角色。
+presets_only = create_agent_app(allow_dynamic_subagents=False)
+
+# 允许临时角色，但工具清单只包含文件读取。
+app = create_agent_app(dynamic_subagent_tools=[read_office_file])
+~~~
+
+直接使用 SubagentRunner 时，对应参数是 allow_dynamic 和 dynamic_tools。dynamic_tools=[] 允许纯分析角色；省略时默认列目录/读文件。白名单是宿主授权的能力上限，tool_names 只能进一步缩小范围，不是由模型自行授权。
+
 ## 执行流程
 
 ~~~text
-主 Agent → delegate_task(agent_name, task, context)
+主 Agent → delegate_task(agent_name, task, context, instructions?, tool_names?)
          → 注册表校验 + 并发准入
          → 新 thread_id / run_id + 独立图状态
          → 子模型 ↔ 允许的 ToolNode 工具
@@ -53,6 +92,7 @@ CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。
 {
   "status": "completed",
   "agent_name": "code_reviewer",
+  "role_source": "registered",
   "run_id": "<child-run-id>",
   "parent_run_id": "<parent-run-id>",
   "result": "结论、证据和未解决问题",
@@ -60,7 +100,7 @@ CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。
 }
 ~~~
 
-status 可能为 completed、rejected、busy、timeout、step_limit 或 failed。失败不会伪装成成功；未知角色、缺少 thread_id 和递归委派会被拒绝。异常只返回类别，不向模型暴露提供商异常中的潜在敏感内容。
+status 可能为 completed、rejected、busy、timeout、step_limit 或 failed。失败不会伪装成成功；新角色缺少 instructions、请求未授权工具、缺少 thread_id 和递归委派会被拒绝。异常只返回类别，不向模型暴露提供商异常中的潜在敏感内容。
 
 取消外层调用时，CancelledError 继续向上传播，并记录 subagent_cancelled。
 
@@ -136,19 +176,20 @@ CLI 每次主任务生成新的 run_id。子事件写到父 thread_id 对应的 
 
 - run_id：当前子任务 ID。
 - parent_run_id：父任务 ID。
-- agent_name：注册角色名称。
+- agent_name：预设或临时角色名称。
+- role_source：registered 或 dynamic；subagent_started 同时记录实际绑定的 tools 清单。
 - execution_thread_id：子图用于技能凭据隔离的 thread_id。
 
 生命周期使用 system_action 的 action 字段：subagent_started、subagent_completed、subagent_timeout、subagent_step_limit、subagent_failed、subagent_cancelled、subagent_rejected、subagent_busy。子模型和工具沿用 llm_input、tool_call、tool_result、ai_message 四类事件；模型日志和返回结果对标准 help_token 字段/文本脱敏。
 
-SDK 应在可信 config.configurable 中传 run_id，以关联主任务和子任务；未提供时 parent_run_id 为 null，仍可通过父 thread_id 与子 run_id 定位。模型 schema 只有 agent_name、task、context，不包含会话、模型、工具清单和预算。
+SDK 应在可信 config.configurable 中传 run_id，以关联主任务和子任务；未提供时 parent_run_id 为 null，仍可通过父 thread_id 与子 run_id 定位。模型 schema 包含 agent_name、task、context、instructions、tool_names；可请求允许工具的子集，但不包含可信会话、模型配置或执行预算。
 
 日志仍使用有界队列与截断结果，不能保证完整回放或无丢失。没有单独实现持久化子任务列表、重启恢复、任务查询/取消 API 或后台通知。
 
 ## 验证
 
-tests/test_subagents.py 覆盖真实子图、主图 ToolNode 的同步/异步往返、独立上下文、模型选择、只读工具、未知工具拒绝、技能凭据跨作用域拒绝、并发准入、超时/取消、步数限制、结果截断、异常脱敏和监控关联。测试不调用真实模型 API。
+tests/test_subagents.py 覆盖真实子图、主图 ToolNode 的同步/异步往返、独立上下文、模型选择、只读工具、未知工具拒绝、技能凭据跨作用域拒绝、并发准入、超时/取消、步数限制、结果截断、异常脱敏和监控关联。其中动态角色测试覆盖临时提示词、工具子集、越权拒绝、预设不可覆盖、同名并发隔离和主图真实委派。测试不调用真实模型 API。
 
-2026-09-09，Ubuntu-24.04 / WSL2、Python 3.12.3：117 项 unittest（含 24 项子 Agent 测试）、独立懒加载测试通过；实际 wheel 隔离构建安装后，成功导入子 Agent 模块并创建委派工具。
+2026-09-09，Ubuntu-24.04 / WSL2、Python 3.12.3：130 项 unittest（含 37 项子 Agent 测试）、独立懒加载测试通过；实际 wheel 隔离构建安装后，成功导入子 Agent 模块并创建委派工具。
 
 参考：[LangChain Subagents](https://docs.langchain.com/oss/python/langchain/multi-agent/subagents)、[LangGraph Subgraph persistence](https://docs.langchain.com/oss/python/langgraph/use-subgraphs)。

@@ -86,6 +86,7 @@ def render_event(line: str):
             
         if data.get("parent_run_id") is not None or data.get("execution_thread_id"):
             label = (f"子 Agent {data.get('agent_name', '?')} | "
+                     f"source={data.get('role_source', 'registered')} | "
                      f"run={data.get('run_id', '?')} | parent={data.get('parent_run_id') or '?'}")
             console.print(Text(label, style="dim cyan"))
 

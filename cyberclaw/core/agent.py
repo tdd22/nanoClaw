@@ -26,6 +26,8 @@ def create_agent_app(
     *,
     enable_subagents: bool | None = None,
     subagent_specs: Optional[Sequence["SubagentSpec"]] = None,
+    allow_dynamic_subagents: bool = True,
+    dynamic_subagent_tools: Optional[List[BaseTool]] = None,
 ):
     """Build the main graph.
 
@@ -45,7 +47,9 @@ def create_agent_app(
         enable_subagents = tools is None or subagent_specs is not None
     if enable_subagents:
         from .subagents import SubagentRunner
-        runner = SubagentRunner(subagent_specs, provider_name=provider_name, model_name=model_name)
+        runner = SubagentRunner(
+            subagent_specs, provider_name=provider_name, model_name=model_name,
+            allow_dynamic=allow_dynamic_subagents, dynamic_tools=dynamic_subagent_tools)
         actual_tools.append(runner.as_tool())
 
     names = [tool.name for tool in actual_tools]
@@ -149,6 +153,7 @@ def create_agent_app(
         if enable_subagents:
             sys_prompt += (
                 "\n复杂且可独立处理的阅读、分析任务可以调用 delegate_task。"
+                "可使用预设角色；需要其他专长时，按 delegate_task 的工具描述临时定义角色。"
                 "只传必要背景与相对路径，由你检查结果并向用户汇总。"
                 "子 Agent 默认不能修改文件；不要声称其完成了修改。"
                 "必须检查 status；failed、timeout、step_limit、busy 或 rejected 都不代表完成。"

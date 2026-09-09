@@ -101,7 +101,7 @@ CLI 中由模型从工具结果读取凭据并填入下一次调用。升级后�
 
 ## Subagents：让主 Agent 委派子任务
 
-默认 CLI 现在注册 delegate_task。主 Agent 可以将独立任务交给子 Agent，等待结果后汇总：
+默认 CLI 注册 delegate_task。主 Agent 可以使用以下两个预设角色，也可以按任务临时定义新的子 Agent，等待结果后汇总：
 
 | 角色 | 用途 | 默认权限 |
 | --- | --- | --- |
@@ -112,13 +112,19 @@ CLI 中由模型从工具结果读取凭据并填入下一次调用。升级后�
 
 > 请让 code_reviewer 检查 project/heartbeat.py 的恢复逻辑，再由你汇总问题。
 
+没有合适的预设角色时，主 Agent 可指定新 agent_name、instructions（职责/方法/输出要求）和 tool_names（所需工具），例如：
+
+> 请临时定义一个测试设计师，阅读 project/agent.py，给出异常路径的测试方案，再由你整理。
+
+动态角色默认可选工具为 list_office_files、read_office_file；不选工具时仅分析传入信息。宿主验证工具白名单，拒绝越权工具和对预设角色的覆盖。角色仅在本次委派生效，不会永久注册；模型、权限上限和预算仍由宿主配置。
+
 每次子任务使用新的消息上下文和执行 thread_id，不继承父 checkpoint 或全局画像；模型只接收显式任务与必要背景。子 Agent 不能继续委派；自定义角色可以在宿主代码中显式选择模型和工具。动态技能仍需在子任务自身作用域中 help → run。
 
 默认每个 app 最多 2 个并发子图调用，超额返回 busy；等待预算 120 秒，最多 16 个图步骤，返回结果最多 6000 字符。主 Agent 必须检查 completed、failed、timeout 等状态。超时是协作式取消，不能保证已启动的同步工具、线程或远端请求立即停止。
 
 CLI 为主任务生成 run_id；子日志带 parent_run_id、agent_name、execution_thread_id，写入父会话日志，monitor 可显示关联。13 个基础内置工具之外，默认主 Agent 额外获得 1 个委派工具。
 
-SDK 默认启用；显式 tools=[...] 保持原行为，可用 enable_subagents=True 开启或通过 subagent_specs 自定义；enable_subagents=False 可关闭。完整示例与预算配置见 [Subagents 使用说明](docs/SUBAGENTS.md)。
+SDK 默认启用；allow_dynamic_subagents=False 可只保留预设角色，dynamic_subagent_tools 可调整动态角色的宿主工具白名单。显式 tools=[...] 保持原行为，可用 enable_subagents=True 开启或通过 subagent_specs 自定义；enable_subagents=False 可关闭。完整示例与预算配置见 [Subagents 使用说明](docs/SUBAGENTS.md)。
 
 这是主任务等待结果的进程内委派，不是后台作业服务。子图不持久化，重启后不能续跑；工具注册隔离也不是 OS 沙盒。
 
@@ -212,7 +218,7 @@ CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
 CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
 ~~~
 
-2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**117 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
+2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**130 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
 
 主要新增测试：
 
@@ -283,11 +289,11 @@ This proves that the session received the manual version, not that the model und
 
 ### Subagents
 
-The default CLI exposes delegate_task with code_reviewer and document_analyst roles. Both only list/read office files. Each invocation starts with a fresh context and execution thread ID; it receives only the explicit task/context, does not inherit the parent checkpoint or global profile, and cannot delegate again.
+The default CLI exposes delegate_task with code_reviewer and document_analyst presets, both limited to listing/reading office files. The main agent can also define a temporary role with a new agent_name, instructions and selected tool_names. The host validates the tool allowlist; an empty selection means text-only analysis. Dynamic definitions are invocation-local and cannot override presets. Models and execution budgets remain host-controlled. Each invocation starts with a fresh context and execution thread ID; it receives only the explicit task/context, does not inherit the parent checkpoint or global profile, and cannot delegate again.
 
 The parent waits for a JSON result and checks its status. Defaults: 2 admitted graph calls per app, 120 seconds, 16 graph steps and 6000 result characters. Cancellation is cooperative and cannot forcibly stop running synchronous tools or remote requests. Child graphs are not persisted or resumed after a restart.
 
-Child events stay in the parent's log file with run_id, parent_run_id, agent_name and execution_thread_id. SDK callers can register explicit role/model/tool configurations or disable delegation. Existing explicit tools=[...] calls retain their tool list unless enabled. See [Subagents guide](docs/SUBAGENTS.md).
+Child events stay in the parent's log file with run_id, parent_run_id, agent_name and execution_thread_id. SDK callers can register explicit role/model/tool configurations or disable delegation. allow_dynamic_subagents=False disables temporary roles only; dynamic_subagent_tools configures their allowed tool catalog. Existing explicit tools=[...] calls retain their tool list unless enabled. See [Subagents guide](docs/SUBAGENTS.md).
 
 ### Current behavior and limits
 
@@ -301,7 +307,7 @@ Child events stay in the parent's log file with run_id, parent_run_id, agent_nam
 
 ### Validation and historical metrics
 
-On 2026-09-09, 117 deterministic unittest cases, the standalone lazy-loading test and an isolated wheel installation/import check passed under Ubuntu-24.04 / WSL2 with Python 3.12.3. Model and execution calls were replaced by test doubles.
+On 2026-09-09, 130 deterministic unittest cases, the standalone lazy-loading test and an isolated wheel installation/import check passed under Ubuntu-24.04 / WSL2 with Python 3.12.3. Model and execution calls were replaced by test doubles.
 
 Historical materials reported 10/20 versus 18/20 safe hits, an increase of 40 percentage points, with average latency of 19.33 versus 23.88 seconds. These simulated results have scoring and baseline limitations and have not been remeasured after this change. They are not production incident rates or general tool-call accuracy.
 
