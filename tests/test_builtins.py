@@ -4,7 +4,7 @@ import os
 import sys
 import tempfile
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -109,7 +109,7 @@ class TestScheduledTasks(unittest.TestCase):
                       if datetime.now().hour >= 9 else
                       datetime.now().replace(hour=9, minute=0, second=0))
         if future_time <= datetime.now():
-            future_time = future_time.replace(day=future_time.day + 1)
+            future_time = future_time + timedelta(days=1)
 
         target_time = future_time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -196,7 +196,7 @@ class TestScheduledTasksWithTasks(unittest.TestCase):
                       if datetime.now().hour >= 9 else
                       datetime.now().replace(hour=9, minute=0, second=0))
         if future_time <= datetime.now():
-            future_time = future_time.replace(day=future_time.day + 1)
+            future_time = future_time + timedelta(days=1)
 
         target_time = future_time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -265,7 +265,7 @@ class TestScheduledTasksWithTasks(unittest.TestCase):
                    if datetime.now().hour >= 10 else
                    datetime.now().replace(hour=10, minute=0, second=0))
         if new_time <= datetime.now():
-            new_time = new_time.replace(day=new_time.day + 1)
+            new_time = new_time + timedelta(days=1)
 
         new_target_time = new_time.strftime("%Y-%m-%d %H:%M:%S")
 

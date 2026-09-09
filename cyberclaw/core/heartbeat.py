@@ -5,6 +5,8 @@ import calendar
 from datetime import datetime, timedelta
 from .config import TASKS_FILE
 from .tools.builtins import tasks_lock
+from .task_storage import write_tasks_atomic
+from .logger import audit_logger
 
 async def pacemaker_loop(task_queue: asyncio.Queue, check_interval: int = 10):
     """
@@ -78,17 +80,19 @@ async def pacemaker_loop(task_queue: asyncio.Queue, check_interval: int = 10):
                     else:
 
                         pending_tasks.append(t) #还未到触发时间的任务继续保留在待办列表里
-                except Exception:
-
-                    pass
+                except Exception as exc:
+                    pending_tasks.append(t)
+                    audit_logger.log_event(thread_id="system", event="system_action",
+                                           content=f"任务记录无效，已保留：{exc}")
 
             #将还没到触发时间的任务和续期后的循环任务写回文件，覆盖原有内容
             if triggered_tasks:
                 try:
-                    with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                        json.dump(pending_tasks, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
+                    write_tasks_atomic(TASKS_FILE, pending_tasks)
+                except Exception as exc:
+                    audit_logger.log_event(thread_id="system", event="system_action",
+                                           content=f"任务写回失败，跳过本次投递：{exc}")
+                    continue
 
         for t in triggered_tasks:
             system_msg = (

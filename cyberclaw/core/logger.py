@@ -1,72 +1,62 @@
-import os
-import json
-import threading
-import queue
+"""Bounded asynchronous JSONL logs with idempotent shutdown."""
 import atexit
 from datetime import datetime, timezone
+import json
+import os
+import queue
+import threading
 
-# 内存队列 + 守护线程
 class JSONLEventLogger:
-    # 单例模式
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls, log_dir: str = "logs"):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-                cls._instance._init_logger(log_dir)
-            return cls._instance
-        
-    def _init_logger(self, log_dir: str):
+    def __init__(self, log_dir="logs", max_queue_size=4096):
+        if max_queue_size < 1:
+            raise ValueError("max_queue_size must be positive")
         self.log_dir = log_dir
-        os.makedirs(self.log_dir, exist_ok=True)
-
-        # 无界内存队列，用于缓冲日志事件
-        self.log_queue = queue.Queue()
-
+        os.makedirs(log_dir, exist_ok=True)
+        self.log_queue = queue.Queue(maxsize=max_queue_size)
+        self._state_lock = threading.Lock()
+        self._shutdown_lock = threading.Lock()
+        self._closed = False
+        self.dropped_events = 0
+        self.write_errors = 0
         self.worker_thread = threading.Thread(target=self._write_loop, daemon=True)
         self.worker_thread.start()
-
-        # 确保程序被关闭时，队列里的剩下日志能写完
         atexit.register(self.shutdown)
 
-    # 后台线程的死循环：一直盯着队列，有日志就写，没日志就阻塞休眠
     def _write_loop(self):
         while True:
-            log_item = self.log_queue.get()
-
-            if log_item is None:
-                self.log_queue.task_done()
-                break
-
+            item = self.log_queue.get()
             try:
-                thread_id = log_item.get("thread_id", "system")
-                safe_id = "".join(c for c in thread_id if c.isalnum() or c in "-_") or "default"
-                file_path = os.path.join(self.log_dir, f"{safe_id}.jsonl")
-
-                with open(file_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(log_item, ensure_ascii=False) + "\n")
-            except Exception as e:
-                print(f"[Logger Error] 异步写日志失败: {e}")
+                if item is None:
+                    return
+                safe_id = "".join(c for c in str(item["thread_id"]) if c.isalnum() or c in "-_") or "default"
+                with open(os.path.join(self.log_dir, safe_id+".jsonl"), "a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(item, ensure_ascii=False)+"\n")
+            except Exception as exc:
+                self.write_errors += 1
+                print(f"[Logger Error] {exc}")
             finally:
                 self.log_queue.task_done()
 
-    # 前台调用的埋点方法
-    def log_event(self, thread_id: str, event: str, **kwargs):
-        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        log_item = {
-            "ts": now_utc,
-            "thread_id": thread_id,
-            "event": event,
-            **kwargs
-        }
-
-        self.log_queue.put(log_item)
+    def log_event(self, thread_id, event, **kwargs):
+        item = {**kwargs, "ts": datetime.now(timezone.utc).isoformat(), "thread_id": thread_id, "event": event}
+        with self._state_lock:
+            if self._closed:
+                return False
+            try:
+                self.log_queue.put_nowait(item)
+                return True
+            except queue.Full:
+                self.dropped_events += 1
+                return False
 
     def shutdown(self):
-        self.log_queue.put(None)
-        self.log_queue.join()
+        with self._shutdown_lock:
+            with self._state_lock:
+                if self._closed:
+                    return
+                self._closed = True
+            self.log_queue.put(None)
+            self.log_queue.join()
+            self.worker_thread.join()
 
 audit_logger = JSONLEventLogger()

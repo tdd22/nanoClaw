@@ -7,6 +7,7 @@ import json
 import uuid
 import threading
 from ..config import MEMORY_DIR, TASKS_FILE
+from ..task_storage import write_tasks_atomic
 from .sandbox_tools import (
     list_office_files,
     read_office_file,
@@ -81,6 +82,14 @@ def get_system_model_info() -> str:
 
 
 @cyberclaw_tool
+def read_user_profile() -> str:
+    """读取当前完整用户画像，在更新画像前查看已有内容。"""
+    if not os.path.exists(PROFILE_PATH):
+        return "暂无记录"
+    with open(PROFILE_PATH, "r", encoding="utf-8") as stream:
+        return stream.read()
+
+@cyberclaw_tool
 def save_user_profile(new_content: str) -> str:
     """
     更新用户的全局显性记忆档案。
@@ -122,14 +131,14 @@ def calculator(expression: str) -> str:
 
 
 @cyberclaw_tool
-def schedule_task(target_time: str, description: str, repeat: str = None, repeat_count: int = None) -> str:
+def schedule_task(target_time: str, description: str, repeat: str | None = None, repeat_count: int | None = None) -> str:
     """
     为一个未来的任务设定闹钟或提醒。
     参数 target_time 必须是严格的格式："YYYY-MM-DD HH:MM:SS"（请先调用 get_current_time 获取当前时间，并在其基础上推算）。
     参数 description 是需要执行的动作或要说的话。
     
     【高级循环功能】：
-    - repeat (可选): 设置重复频率。可选值为 "hourly", "daily", "weekly"。如果不重复请留空。
+    - repeat (可选): 设置重复频率。可选值为 "hourly", "daily", "weekly", "monthly"。如果不重复请留空。
     - repeat_count (可选): 结合 repeat 使用，表示一共需要触发几次。
     
     【案例教学】：
@@ -158,6 +167,10 @@ def schedule_task(target_time: str, description: str, repeat: str = None, repeat
             f" 你传入的是：{target_time}"
         )
 
+    if repeat not in (None, "hourly", "daily", "weekly", "monthly"):
+        return "设定失败：repeat 必须为 hourly/daily/weekly/monthly 或空。"
+    if repeat_count is not None and (isinstance(repeat_count, bool) or repeat_count < 1 or repeat is None):
+        return "设定失败：repeat_count 必须为正整数，且需要 repeat。"
     with tasks_lock:
         tasks = []
         if os.path.exists(TASKS_FILE):
@@ -179,8 +192,7 @@ def schedule_task(target_time: str, description: str, repeat: str = None, repeat
         tasks.append(new_task)
 
         try:
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                json.dump(tasks, f, ensure_ascii=False, indent=2)
+            write_tasks_atomic(TASKS_FILE, tasks)
         except Exception as e:
             return f"设定失败：写入任务队列异常 {str(e)}"
 
@@ -252,8 +264,7 @@ def delete_scheduled_task(task_id: str) -> str:
             if len(new_tasks) == len(tasks):
                 return f"删除失败：未找到 ID 为 {task_id} 的任务。"
             
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                json.dump(new_tasks, f, ensure_ascii=False, indent=2)
+            write_tasks_atomic(TASKS_FILE, new_tasks)
             
             return f" 任务 [ID: {task_id}] 已成功取消。"
         except Exception as e:
@@ -261,7 +272,7 @@ def delete_scheduled_task(task_id: str) -> str:
     
 
 @cyberclaw_tool
-def modify_scheduled_task(task_id: str, new_time: str = None, new_description: str = None) -> str:
+def modify_scheduled_task(task_id: str, new_time: str | None = None, new_description: str | None = None) -> str:
     """
     修改现有定时任务的时间或内容。
     
@@ -307,8 +318,7 @@ def modify_scheduled_task(task_id: str, new_time: str = None, new_description: s
             if not found:
                 return f"修改失败：未找到 ID 为 {task_id} 的任务。"
             
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                json.dump(tasks, f, ensure_ascii=False, indent=2)
+            write_tasks_atomic(TASKS_FILE, tasks)
                 
             return f" 任务 [ID: {task_id}] 已成功更新。"
         except ValueError:
@@ -321,6 +331,7 @@ BUILTIN_TOOLS = [
     get_current_time,
     calculator,
     save_user_profile,
+    read_user_profile,
     list_office_files,
     read_office_file,
     write_office_file,

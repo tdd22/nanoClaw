@@ -103,6 +103,9 @@ def render_event(line: str):
             content = f"[bold white] ● 执行结果: [/bold white][bold cyan]{tool_name}[/bold cyan]\n{display_result}"
             console.print(Panel(content, title=f"✦ 环境回传 [ {ts} ]", title_align="left", border_style="cyan", width=60))
             
+        elif event == "ai_message":
+            console.print(Panel(Text(str(data.get("content", ""))), title=f"AI 回复 [ {ts} ]", border_style="magenta"))
+
         elif event == "system_action":
             action = data.get("content", "")
             console.print(f"{prefix}[warning]✦ 底层状态机：{action}[/warning]")

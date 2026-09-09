@@ -114,7 +114,8 @@ def test_lazy_loading():
             print(f"[OK] 速度提升: {(elapsed / elapsed2):.2f}x")
         else:
             print(f"[OK] 速度提升: 缓存响应极快 (< 0.001s)")
-        assert elapsed2 <= elapsed, "第二次调用应该更快或相等（使用缓存）"
+        assert result2 == result, "相同说明版本应返回相同内容"
+        assert len(skill_loader_module._lazy_loader._content_cache) == 1
         
         print("\n" + "=" * 60)
         print("测试 2: 强制重新扫描")
