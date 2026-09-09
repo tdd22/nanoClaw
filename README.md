@@ -18,7 +18,7 @@
 
 ## 项目概述
 
-CyberClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Python 和 LangGraph 实现通用智能体工作流。项目围绕“模型决策 → 工具行动 → 结果观察”构建状态图，提供 SQLite 会话持久化、用户画像、上下文摘要、动态技能、定时任务和结构化行为日志。
+CyberClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Python 和 LangGraph 实现通用智能体工作流。项目围绕“模型决策 → 工具行动 → 结果观察”构建状态图，提供 SQLite 会话持久化、用户画像、上下文摘要、动态技能、定时任务、子 Agent 委派和结构化行为日志。
 
 核心设计是 **help → run 两段式技能调用**：模型先获取技能说明，再决定执行或更换技能。当前版本在动态技能执行端加入一次性凭据校验，让调用顺序由代码落实。项目是单机 CLI 应用；OpenClaw 的产品理念与 SKILL.md 约定是参考来源，不代表对其 Node.js 代码的逐模块迁移或功能完全对等。
 
@@ -57,6 +57,7 @@ Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。�
 | 上下文压缩 | 按 HumanMessage 开始的完整回合裁剪；主调用达到 40 回合后保留最近 10 回合，并让 LLM 合并旧摘要 |
 | 长期记忆 | Markdown 用户画像，支持读取及主动更新；每次模型决策注入画像 |
 | 动态技能 | 扫描 office/skills 下的 SKILL.md 或 README.md，按需读取完整说明，执行前校验 help 凭据 |
+| 子 Agent 委派 | 主 Agent 通过 delegate_task 调用代码审查/文档整理子 Agent，独立上下文、只读默认工具、预算与审计关联 |
 | 行为日志 | 5 类 JSONL 事件，后台线程写盘，Rich 终端监控 |
 | 定时任务 | 同进程心跳协程每 10 秒检查 tasks.json，支持一次性及 hourly/daily/weekly/monthly 规则 |
 | 模型适配 | 模型工厂封装 OpenAI 兼容接口及 Anthropic、Ollama 分支 |
@@ -97,6 +98,29 @@ print(result)
 CLI 中由模型从工具结果读取凭据并填入下一次调用。升级后请重启 CLI；SDK 调用方必须提供 thread_id。没有会话配置时仍可阅读 help，但不会签发凭据。
 
 凭据证明相应会话获得了该版本说明，不证明模型理解正确、执行安全或用户已授权。该流程约束动态技能接口；内置 execute_office_shell 是单独的工具。完整迁移规则与限制见 [运行时修复说明](docs/RUNTIME_HARDENING.md)。
+
+## Subagents：让主 Agent 委派子任务
+
+默认 CLI 现在注册 delegate_task。主 Agent 可以将独立任务交给子 Agent，等待结果后汇总：
+
+| 角色 | 用途 | 默认权限 |
+| --- | --- | --- |
+| code_reviewer | 代码阅读、缺陷分析、测试建议 | 列目录、读文件 |
+| document_analyst | 资料提炼、比较、文档草稿 | 列目录、读文件 |
+
+先将资料放在 workspace/office/ 下，再启动 cyberclaw run，例如：
+
+> 请让 code_reviewer 检查 project/heartbeat.py 的恢复逻辑，再由你汇总问题。
+
+每次子任务使用新的消息上下文和执行 thread_id，不继承父 checkpoint 或全局画像；模型只接收显式任务与必要背景。子 Agent 不能继续委派；自定义角色可以在宿主代码中显式选择模型和工具。动态技能仍需在子任务自身作用域中 help → run。
+
+默认每个 app 最多 2 个并发子图调用，超额返回 busy；等待预算 120 秒，最多 16 个图步骤，返回结果最多 6000 字符。主 Agent 必须检查 completed、failed、timeout 等状态。超时是协作式取消，不能保证已启动的同步工具、线程或远端请求立即停止。
+
+CLI 为主任务生成 run_id；子日志带 parent_run_id、agent_name、execution_thread_id，写入父会话日志，monitor 可显示关联。13 个基础内置工具之外，默认主 Agent 额外获得 1 个委派工具。
+
+SDK 默认启用；显式 tools=[...] 保持原行为，可用 enable_subagents=True 开启或通过 subagent_specs 自定义；enable_subagents=False 可关闭。完整示例与预算配置见 [Subagents 使用说明](docs/SUBAGENTS.md)。
+
+这是主任务等待结果的进程内委派，不是后台作业服务。子图不持久化，重启后不能续跑；工具注册隔离也不是 OS 沙盒。
 
 ## 技能安装与更新
 
@@ -188,9 +212,11 @@ CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
 CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
 ~~~
 
-2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**93 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
+2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**117 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
 
 主要新增测试：
+
+- tests/test_subagents.py：主/子真实图、上下文与工具隔离、并发、超时/取消、技能凭据作用域、审计和结果边界。
 
 - tests/test_runtime_guards.py：顺序校验、令牌隔离/过期/重放/并发、文档变化、真实图配置传递、路径及日志。
 - tests/test_task_storage_and_shutdown.py：原子写入失败、心跳投递边界、非法参数和退出排空。
@@ -203,6 +229,7 @@ CyberClaw/
 │   ├── agent.py          # 组装图、模型节点、摘要与审计埋点
 │   ├── context.py        # AgentState、消息 reducer、完整回合裁剪
 │   ├── skill_loader.py   # 技能发现、说明缓存、help 凭据与 run 校验
+│   ├── subagents.py      # 子 Agent 注册、独立子图、预算、委派工具与审计
 │   ├── provider.py       # 模型工厂
 │   ├── config.py         # 工作目录、数据库和画像路径
 │   ├── logger.py         # 有界异步 JSONL 日志
@@ -254,6 +281,14 @@ A dynamic skill's help response includes a one-use help_token. Each run requires
 
 This proves that the session received the manual version, not that the model understood it or that execution is authorized. Built-in Shell is a separate capability. See [runtime and migration notes](docs/RUNTIME_HARDENING.md).
 
+### Subagents
+
+The default CLI exposes delegate_task with code_reviewer and document_analyst roles. Both only list/read office files. Each invocation starts with a fresh context and execution thread ID; it receives only the explicit task/context, does not inherit the parent checkpoint or global profile, and cannot delegate again.
+
+The parent waits for a JSON result and checks its status. Defaults: 2 admitted graph calls per app, 120 seconds, 16 graph steps and 6000 result characters. Cancellation is cooperative and cannot forcibly stop running synchronous tools or remote requests. Child graphs are not persisted or resumed after a restart.
+
+Child events stay in the parent's log file with run_id, parent_run_id, agent_name and execution_thread_id. SDK callers can register explicit role/model/tool configurations or disable delegation. Existing explicit tools=[...] calls retain their tool list unless enabled. See [Subagents guide](docs/SUBAGENTS.md).
+
 ### Current behavior and limits
 
 - The main agent trims at 40 user turns, keeps the latest 10 and merges older content into an LLM summary.
@@ -266,7 +301,7 @@ This proves that the session received the manual version, not that the model und
 
 ### Validation and historical metrics
 
-On 2026-09-09, 93 deterministic unittest cases, the standalone lazy-loading test and an isolated wheel installation/import check passed under Ubuntu-24.04 / WSL2 with Python 3.12.3. Model and execution calls were replaced by test doubles.
+On 2026-09-09, 117 deterministic unittest cases, the standalone lazy-loading test and an isolated wheel installation/import check passed under Ubuntu-24.04 / WSL2 with Python 3.12.3. Model and execution calls were replaced by test doubles.
 
 Historical materials reported 10/20 versus 18/20 safe hits, an increase of 40 percentage points, with average latency of 19.33 versus 23.88 seconds. These simulated results have scoring and baseline limitations and have not been remeasured after this change. They are not production incident rates or general tool-call accuracy.
 

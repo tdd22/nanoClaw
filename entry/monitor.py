@@ -84,6 +84,11 @@ def render_event(line: str):
         except:
             ts = ts_str.split("T")[-1][:8]
             
+        if data.get("parent_run_id") is not None or data.get("execution_thread_id"):
+            label = (f"子 Agent {data.get('agent_name', '?')} | "
+                     f"run={data.get('run_id', '?')} | parent={data.get('parent_run_id') or '?'}")
+            console.print(Text(label, style="dim cyan"))
+
         prefix = f"[timestamp][ {ts} ][/timestamp] "
         
         if event == "llm_input":
@@ -108,7 +113,8 @@ def render_event(line: str):
 
         elif event == "system_action":
             action = data.get("content", "")
-            console.print(f"{prefix}[warning]✦ 底层状态机：{action}[/warning]")
+            action_name = data.get("action", "")
+            console.print(Text(f"[ {ts} ] {action_name} {action}", style="color(141)"))
             
     except: pass
 

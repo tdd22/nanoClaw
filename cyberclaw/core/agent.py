@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Sequence, TYPE_CHECKING
 from langchain_core.tools import BaseTool
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -15,19 +15,39 @@ import re
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import ANSI
 
+if TYPE_CHECKING:
+    from .subagents import SubagentSpec
+
 def create_agent_app(
     provider_name: str = "openai",
     model_name: str = "gpt-4o-mini",
     tools: Optional[List[BaseTool]] = None,
-    checkpointer = None
+    checkpointer = None,
+    *,
+    enable_subagents: bool | None = None,
+    subagent_specs: Optional[Sequence["SubagentSpec"]] = None,
 ):
+    """Build the main graph.
+
+    Default tools include delegation. Explicit tools keep their old behavior
+    unless enable_subagents=True or subagent_specs is supplied. False disables
+    automatic delegation registration, including with custom specs.
+    """
     if tools is None:
         dynamic_tools = load_dynamic_skills()
         actual_tools = BUILTIN_TOOLS + dynamic_tools
     else:
-        actual_tools = tools
+        actual_tools = list(tools)
     
     
+    # Preserve explicit tools= behavior; the default CLI gains delegation.
+    if enable_subagents is None:
+        enable_subagents = tools is None or subagent_specs is not None
+    if enable_subagents:
+        from .subagents import SubagentRunner
+        runner = SubagentRunner(subagent_specs, provider_name=provider_name, model_name=model_name)
+        actual_tools.append(runner.as_tool())
+
     names = [tool.name for tool in actual_tools]
     if len(names) != len(set(names)):
         raise ValueError("工具名称冲突：内置工具与技能必须使用唯一名称")
@@ -42,6 +62,10 @@ def create_agent_app(
         """
         thread_id = config.get("configurable", {}).get("thread_id", "system_default")
 
+        def log_event(**kwargs):
+            audit_logger.log_event(run_id=config.get("configurable", {}).get("run_id"),
+                                   agent_name="main", **kwargs)
+
         raw_messages = state["messages"]
 
         if raw_messages:
@@ -52,7 +76,7 @@ def create_agent_app(
                 else:
                     break
             for msg in reversed(recent_tool_msgs):
-                audit_logger.log_event(
+                log_event(
                     thread_id=thread_id,
                     event="tool_result",
                     tool = msg.name,
@@ -122,6 +146,14 @@ def create_agent_app(
             f"=============================\n"
         )
 
+        if enable_subagents:
+            sys_prompt += (
+                "\n复杂且可独立处理的阅读、分析任务可以调用 delegate_task。"
+                "只传必要背景与相对路径，由你检查结果并向用户汇总。"
+                "子 Agent 默认不能修改文件；不要声称其完成了修改。"
+                "必须检查 status；failed、timeout、step_limit、busy 或 rejected 都不代表完成。"
+            )
+
         if active_summary:
             sys_prompt += f"\n\n[近期对话上下文]\n{active_summary}\n\n(注：这是系统自动生成的近期沟通摘要，请结合它来理解用户的最新问题)"
 
@@ -133,7 +165,7 @@ def create_agent_app(
                 m.content = m.content.encode('utf-8', 'ignore').decode('utf-8')
 
         # 记录即将发送给发模型的消息 (监控Token)
-        audit_logger.log_event(
+        log_event(
             thread_id=thread_id,
             event="llm_input",
             message_count=len(msgs_for_llm)
@@ -144,14 +176,14 @@ def create_agent_app(
         # 解析大模型的回答并记录到日志
         if response.tool_calls:
             for tool_call in response.tool_calls:
-                audit_logger.log_event(
+                log_event(
                     thread_id=thread_id,
                     event="tool_call",
                     tool=tool_call["name"],
                     args={k: ("[REDACTED]" if k == "help_token" else v) for k, v in tool_call["args"].items()}
                 )
         elif response.content:
-            audit_logger.log_event(
+            log_event(
                 thread_id=thread_id,
                 event="ai_message",
                 content=response.content

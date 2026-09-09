@@ -3,6 +3,7 @@ import sys
 import time
 import asyncio
 import random
+from uuid import uuid4
 from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
@@ -161,8 +162,11 @@ async def async_main():
                 spinner.is_tool_calling = False
                 
                 inputs = {"messages": [HumanMessage(content=user_input)]}
+                run_config = {**config, "configurable": {
+                    **config.get("configurable", {}), "run_id": uuid4().hex}}
+
                 try:
-                    async for event in app.astream(inputs, config=config, stream_mode="updates"):
+                    async for event in app.astream(inputs, config=run_config, stream_mode="updates"):
                         for node_name, node_data in event.items():
                             if node_name == "agent":
                                 last_msg = node_data["messages"][-1]

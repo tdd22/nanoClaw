@@ -1,5 +1,7 @@
 # 执行协议与本次运行时修复
 
+后续新增的子 Agent 委派与独立执行作用域见 [Subagents 说明](SUBAGENTS.md)。以下 93 项结果记录的是强制校验修复阶段；包含子 Agent 的最新回归结果见 README。
+
 ## help → run：现在由代码强制
 
 每次动态 Skill 执行都需要一次新的 help：
