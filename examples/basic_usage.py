@@ -22,6 +22,7 @@ def main():
     print("-" * 50)
 
     state = {"messages": []}
+    config = {"configurable": {"thread_id": "basic-usage"}}
 
     while True:
         user_input = input("\n[你]: ")
@@ -38,7 +39,7 @@ def main():
         print("\n[CyberClaw 思考中...]")
         
         # 使用 stream_mode="updates" 可以让我们精准捕捉到每个节点运行后的增量状态
-        for event in app.stream(state, stream_mode="updates"):
+        for event in app.stream(state, config=config, stream_mode="updates"):
             
             # 遍历当前事件中所有执行完毕的节点 (通常一次只有一个)
             for node_name, node_state in event.items():

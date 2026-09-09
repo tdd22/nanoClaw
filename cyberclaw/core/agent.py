@@ -11,6 +11,7 @@ from .config import MEMORY_DIR
 from .skill_loader import load_dynamic_skills
 from langchain_core.runnables import RunnableConfig
 import os
+import re
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import ANSI
 
@@ -27,6 +28,9 @@ def create_agent_app(
         actual_tools = tools
     
     
+    names = [tool.name for tool in actual_tools]
+    if len(names) != len(set(names)):
+        raise ValueError("工具名称冲突：内置工具与技能必须使用唯一名称")
     tool_node = ToolNode(actual_tools)
 
     llm = get_provider(provider_name=provider_name, model_name=model_name)
@@ -52,7 +56,7 @@ def create_agent_app(
                     thread_id=thread_id,
                     event="tool_result",
                     tool = msg.name,
-                    result_summary = msg.content[:200]
+                    result_summary = re.sub(r"help_token: [A-Za-z0-9_-]+", "help_token: [REDACTED]", msg.content)[:200]
                 )
 
         current_summary = state.get("summary", "")
@@ -135,7 +139,7 @@ def create_agent_app(
             message_count=len(msgs_for_llm)
         )
 
-        response = llm_with_tools.invoke(msgs_for_llm)
+        response = llm_with_tools.invoke(msgs_for_llm, config=config)
 
         # 解析大模型的回答并记录到日志
         if response.tool_calls:
@@ -144,7 +148,7 @@ def create_agent_app(
                     thread_id=thread_id,
                     event="tool_call",
                     tool=tool_call["name"],
-                    args=tool_call["args"]
+                    args={k: ("[REDACTED]" if k == "help_token" else v) for k, v in tool_call["args"].items()}
                 )
         elif response.content:
             audit_logger.log_event(

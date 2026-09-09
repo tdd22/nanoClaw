@@ -11,6 +11,8 @@ class AgentState(TypedDict):
 
 def trim_context_messages(messages: list[BaseMessage], trigger_turns: int = 8, keep_turns: int = 4) -> tuple[list[BaseMessage], list[BaseMessage]]:
     # 按照完整用户回合来裁剪上下文：即 一个会从从HumanMessage开始，直到下一个HumanMessage结束，会把AIMessage、tool_calls、ToolMessage一并保留
+    if keep_turns < 1 or trigger_turns < 1 or keep_turns > trigger_turns:
+        raise ValueError("需要 1 <= keep_turns <= trigger_turns")
     first_system = next((m for m in messages if isinstance(m, SystemMessage)), None)
     non_system_msgs = [m for m in messages if not isinstance(m, SystemMessage)]
 

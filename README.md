@@ -4,1323 +4,276 @@
 
 # CyberClaw
 
-###  **当 AI 开始"黑箱操作"，你需要一双透视眼**
+**基于 LangGraph 的通用智能体：可观察的决策、可扩展的技能、执行前的协议校验**
 
-[![CyberClaw](https://img.shields.io/badge/CyberClaw-1.0.0-purple.svg?logo=cyberpunk)](https://github.com/ttguy0707/CyberClaw)
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![LangGraph](https://img.shields.io/badge/LangGraph-1.x-blue.svg)](https://langchain-ai.github.io/langgraph/)
-[![LangChain](https://img.shields.io/badge/LangChain-1.x-blue.svg)](https://python.langchain.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](tests/)
-[![GitHub](https://img.shields.io/badge/GitHub-@ttguy0707-black.svg?logo=github)](https://github.com/ttguy0707)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](setup.py)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/ttguy0707/CyberClaw)](https://github.com/ttguy0707/CyberClaw/stargazers)
 
-**下一代透明智能体架构** · Next-Gen Transparent Agent Architecture
-
-🌐 Language: [中文](#中文) · [English](#english)
-
-中文导航: [快速开始](#-快速开始) · [核心能力](#-核心能力) · [架构图](#-系统架构) · [示例](#-基本用法)
-
-English Nav: [Quick Start](#-quick-start) · [Core Capabilities](#-core-capabilities) · [Architecture](#-system-architecture) · [Examples](#-basic-usage)
+[中文](#中文) · [English](#english)
 
 </div>
-
----
-
-> 🤖 **你的 AI 在背着你做什么？CyberClaw 让所有行为无所遁形**
-> 
-> 💡 **灵感来源**：受 [OpenClaw](https://github.com/openclaw/openclaw) 的启发，CyberClaw 专注于解决 AI 智能体的透明度和可控性问题。
-
----
 
 <a id="中文"></a>
 
+## 项目概述
 
-## 📖 简介
+CyberClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Python 和 LangGraph 实现通用智能体工作流。项目围绕“模型决策 → 工具行动 → 结果观察”构建状态图，提供 SQLite 会话持久化、用户画像、上下文摘要、动态技能、定时任务和结构化行为日志。
 
-CyberClaw 是一个**企业级透明可控智能体**，重新定义 AI 系统的可信边界：
+核心设计是 **help → run 两段式技能调用**：模型先获取技能说明，再决定执行或更换技能。当前版本在动态技能执行端加入一次性凭据校验，让调用顺序由代码落实。项目是单机 CLI 应用；OpenClaw 的产品理念与 SKILL.md 约定是参考来源，不代表对其 Node.js 代码的逐模块迁移或功能完全对等。
 
-- **🔍 白盒化决策** → 5 类事件审计 + JSONL 日志 + Rich 监控终端，所有行为可追溯
-- **🛡️ 零信任执行** → 两段式调用（help → run），先看说明书再执行，P0 级事故率降低 80%
-- **🧠 持续学习** → 双水位记忆系统（长期画像 + 短期摘要），越用越懂你
-- **⚡ 复杂任务编排** → 心跳任务系统 + 可插拔技能 + MCP 服务集成，解放双手
+## 快速开始
 
-### 🔌 技能生态兼容
+需要 Python 3.10+。以下命令适用于 Linux / WSL2：
 
-CyberClaw 支持**OpenClaw 技能**和**Claude Code 技能**，可直接使用两个生态系统的丰富技能资源，无需重新开发。
-
-### 🌟 核心能力
-
-| 能力 | 说明 | 优势 |
-|------|------|------|
-| **🧠 双水位记忆** | 长期画像 + 短期摘要，持续学习用户偏好 | 越用越懂你，避免重复询问 |
-| **🔍 全行为审计** | 5 类事件实时审计，JSONL 日志 + Rich 监控终端 | 告别黑箱，所有决策可追溯 |
-| **🛡️ 零信任执行** | help → run 两段式调用，先看说明书再执行 | P0 级事故率降低 80%（50% → 10%）|
-| **⏰ 心跳任务引擎** | 后台独立进程，自动执行定时任务 | 解放双手，复杂任务自动化 |
-| **🖥️ 跨平台支持** | Unix + Windows 双平台自适应，LLM 自主选择命令 | 一套代码，全平台运行 |
-
----
-
-## ✨ 功能特性
-
-### 🧠 智能核心
-
-- **双水位记忆系统**
-  - 长期画像 (`user_profile.md`)：用户偏好、职业、特殊要求
-  - 近期摘要 (SQLite)：每 MAX_TURNS 轮自动摘要，保留最近 KEEP_TURNS 轮
-  - 上下文修剪：智能保留关键对话，防止 Token 爆炸
-
-- **两段式技能调用**
-  - `mode='help'`：查看完整说明书（SKILL.md）
-  - `mode='run'`：执行具体操作
-  - 支持反悔机制：看完说明书可以换工具
-
-- **透明监控系统**
-  - 5 类事件审计：`llm_input`, `tool_call`, `tool_result`, `ai_message`, `system_action`
-  - JSONL 日志格式，支持 `tail -f` 实时监控
-  - Rich 终端 UI，颜色/面板区分事件类型
-
-- **心跳任务系统**
-  - 后台独立进程，每秒检查任务队列
-  - 支持 daily/weekly/monthly 循环任务
-  - 任务持久化存储，重启不丢失
-
-### 🛡️ 安全沙盒
-
-- **跨平台路径拦截**
-  - Unix + Windows 双平台越权拦截
-  - 禁止 `..`、绝对路径、用户主目录访问
-  - 所有操作限制在 `office/` 工位内
-
-- **Shell 命令安全**
-  - 危险命令正则匹配拦截
-  - 60 秒超时熔断
-  - 非交互式执行（必须带 `-y` 等参数）
-
-### 🖥️ 跨平台特性
-
-- **系统信息注入** - 自动识别操作系统，注入平台相关信息
-- **LLM 自主选择命令** - 根据平台特性生成合适的命令（PowerShell / Bash）
-- **路径格式兼容** - 自动处理 `/` 和 `\` 路径分隔符
-- **环境变量适配** - 跨平台环境变量读取和设置
-
-### 🔧 内置工具
-
-| 工具 | 功能 | 示例 |
-|------|------|------|
-| `get_current_time` | 获取当前时间 | "现在几点了？" |
-| `calculator` | 数学计算器 | "25 乘以 48 等于多少" |
-| `schedule_task` | 定时任务/闹钟 | "每天早上 8 点提醒我喝水" |
-| `list_scheduled_tasks` | 查看任务列表 | "我都有哪些任务" |
-| `delete_scheduled_task` | 删除任务 | "取消明天的会议提醒" |
-| `modify_scheduled_task` | 修改任务 | "把 8 点的会议改成 9 点" |
-| `get_system_model_info` | 获取模型信息 | "你是什么模型" |
-| `save_user_profile` | 更新用户画像 | "记住我喜欢喝冰美式" |
-| `list_office_files` | 列出文件 | "看看 office 里有什么" |
-| `read_office_file` | 读取文件 | "读取 readme.txt" |
-| `write_office_file` | 写入文件 | "创建 test.py" |
-| `execute_office_shell` | 执行 Shell 命令 | "运行 python test.py" |
-
-### 🎯 可插拔技能
-
-- **动态加载**：自动扫描 `workspace/office/skills/` 目录
-- **SKILL.md 规范**：每个技能包含完整说明书
-- **兼容 OpenClaw 和 Claude Code 技能**：可直接使用两个生态系统的技能
-- **推荐技能**：
-  - `skill-creator`：用自然语言让 CyberClaw 自己创建技能
-  - `skill-vetter`：检查技能的安全性
-  - `mcporter`：连接外部 MCP (Model Context Protocol) 服务
-  - `mcp-builder`：构建自己的 MCP 服务
-  - `tavily-search`：AI 优化网络搜索
-  - `weather`：天气查询
-
----
-
-## 🚀 快速开始
-
-### 1️⃣ 安装
-
-```bash
-# 克隆项目
+~~~bash
 git clone https://github.com/ttguy0707/CyberClaw.git
 cd CyberClaw
-
-# 安装依赖并注册命令行工具（一步完成）
-pip install -e .
-```
-
-> 💡 **推荐使用虚拟环境**：
-> ```bash
-> # 创建虚拟环境
-> python3 -m venv venv
-> source venv/bin/activate  # Windows: venv\Scripts\activate
-> 
-> # 安装项目（会自动安装 requirements.txt 中的依赖）
-> pip install -e .
-> ```
-> 
-> 安装完成后，即可在任意目录使用 `cyberclaw` 命令。
-
-### 2️⃣ 配置
-
-有两种配置方式：**自动配置向导**（推荐）或 **手动配置**。
-
-#### 方式一：自动配置向导（推荐）
-
-```bash
-# 启动交互式配置向导
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 cyberclaw config
-```
-
-配置向导会引导你：
-1. 选择模型提供商（OpenAI / Anthropic / 阿里云 / 腾讯 / Z.AI / Ollama）
-2. 输入 API Key
-3. 配置 Base URL（可选）
-4. **自动测试连接**，确保配置正确
-
-![配置向导](docs/config.png)
-
-#### 方式二：手动配置
-
-```bash
-# 复制示例配置文件
-cp .env.example .env
-
-# 编辑配置文件
-vim .env  # 或使用你喜欢的编辑器
-```
-
-编辑 `.env` 文件，配置必要的参数：
-
-```bash
-# 模型提供商
-DEFAULT_PROVIDER=aliyun
-DEFAULT_MODEL=glm-5
-
-# API Key (根据提供商选择对应的 Key)
-OPENAI_API_KEY=sk-your-api-key-here
-
-# Base URL (可选，使用代理时配置)
-OPENAI_API_BASE=https://coding.dashscope.aliyuncs.com/v1
-```
-
-**配置说明：**
-- `DEFAULT_PROVIDER`: 模型提供商 (`openai`, `anthropic`, `aliyun`, `tencent`, `z.ai`, `ollama`)
-- `DEFAULT_MODEL`: 模型名称 (如 `gpt-4o-mini`, `glm-5`, `qwen-max`)
-- `OPENAI_API_KEY`: OpenAI 或兼容接口的 API Key
-- `ANTHROPIC_API_KEY`: Anthropic 的 API Key
-- `OPENAI_API_BASE`: 兼容接口的 Base URL（阿里云、腾讯云等）
-- `OLLAMA_BASE_URL`: Ollama 本地服务地址（默认 `http://localhost:11434`）
-
-> 💡 **工作区配置**：工作区路径已在代码中初始化，默认为项目根目录的 `workspace` 文件夹，无需在 `.env` 中配置。仅当需要自定义工作区位置时，才设置 `CYBERCLAW_WORKSPACE` 环境变量。
-
-> 💡 提示：配置完成后，可运行 `cyberclaw run` 聊天测试连接是否正常。
-
-### 3️⃣ 运行
-
-```bash
-# 启动主程序
 cyberclaw run
-```
+~~~
 
-![欢迎界面](docs/welcome.png)
+Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。实际可用命令取决于宿主系统。
 
-### 4️⃣ 基本用法
+配置向导会写入模型设置并测试普通消息连通性。也可以复制 .env.example 为 .env，设置 DEFAULT_PROVIDER、DEFAULT_MODEL、对应 API Key 和 Base URL。请按所选提供商修改模板中的地址与模型。
 
-启动后进入交互式对话界面，如图所示：
+- OpenAI 兼容接口使用 OPENAI_API_KEY 和可选的 OPENAI_API_BASE。
+- Anthropic 分支需要额外安装 langchain-anthropic；Ollama 分支需要 langchain-community，并启动本地模型服务。这些可选分支尚未在本次回归中进行真实 API 验证。
+- 默认数据目录为项目下 workspace；部署时可通过 CYBERCLAW_WORKSPACE 指向自己的可写目录。
+- 在另一个终端运行 cyberclaw monitor 查看当前 CLI 会话的日志。
+- 输入 /exit 结束 CLI；心跳任务也随主进程停止。
 
 ![聊天界面](docs/chat.png)
 
-**常用命令示例：**
+## 核心能力与当前实现
 
-| 类型 | 命令示例 | 说明 |
-|------|----------|------|
-| ⏰ 时间查询 | `现在几点了？` | 获取当前时间 |
-| 🧮 数学计算 | `帮我算一下 25 乘以 48` | 调用计算器工具 |
-| ⏲️ 定时任务 | `每天早上 8 点提醒我喝水` | 创建循环任务 |
-| 📋 查看任务 | `我都有哪些任务` | 查看任务列表 |
-| ✏️ 修改任务 | `把 8 点的喝水提醒改成 9 点` | 修改已有任务 |
-| ❌ 删除任务 | `取消明天的会议提醒` | 删除任务 |
-| 📁 文件操作 | `看看 office 里有什么文件` | 列出工位文件 |
-| 📖 读取文件 | `读取 readme.txt` | 读取文件内容 |
-| 📝 创建文件 | `创建 test.py` | 写入新文件 |
-| 💻 Shell 命令 | `运行 python test.py` | 执行 Shell 命令 |
-| 🚪 退出 | `/exit` | 退出程序 |
+| 能力 | 实现 |
+| --- | --- |
+| 状态图工作流 | START → agent → tools → agent；模型不再返回 tool_calls 时结束本次请求 |
+| 会话持久化 | CLI 使用 AsyncSqliteSaver 保存 messages 和 summary，通过 thread_id 关联会话 |
+| 上下文压缩 | 按 HumanMessage 开始的完整回合裁剪；主调用达到 40 回合后保留最近 10 回合，并让 LLM 合并旧摘要 |
+| 长期记忆 | Markdown 用户画像，支持读取及主动更新；每次模型决策注入画像 |
+| 动态技能 | 扫描 office/skills 下的 SKILL.md 或 README.md，按需读取完整说明，执行前校验 help 凭据 |
+| 行为日志 | 5 类 JSONL 事件，后台线程写盘，Rich 终端监控 |
+| 定时任务 | 同进程心跳协程每 10 秒检查 tasks.json，支持一次性及 hourly/daily/weekly/monthly 规则 |
+| 模型适配 | 模型工厂封装 OpenAI 兼容接口及 Anthropic、Ollama 分支 |
+| 文件与 Shell 工具 | 相对路径校验、命令白名单、展开语法过滤、60 秒 subprocess 超时 |
 
-### ⏰ 心跳任务系统
+函数 trim_context_messages 的默认参数为 8/4，agent_node 显式使用 40/10。水位可在代码调用参数中调整，当前没有对应的 CLI 配置项。达到阈值后裁剪，因此也不是固定每 40 个新增回合触发。按回合控制不等于按 token 控制。
 
-CyberClaw 内置心跳任务系统（Heartbeat），自动在后台执行定时任务：
+SQLite checkpoint 保存可恢复的图状态；它不提供外部工具副作用的恰好一次执行。长期画像当前是全局文件，尚未按用户隔离。
 
-- **自动触发**：心跳进程每秒检查任务队列，到点自动触发
-- **循环任务**：支持 daily/weekly/monthly 循环模式
-- **任务持久化**：任务保存在 `workspace/tasks.json`，重启不丢失
-- **实时监控**：运行 `cyberclaw monitor` 可查看任务执行日志
+## 两段式调用：从约定到强制校验
 
-**心跳任务示例：**
-```bash
-# 创建循环任务
-> 每天早上 8 点提醒我喝水
-✅ 任务已加入队列 | 循环模式：daily | 首发时间：2026-04-07 08:00:00
+每次动态技能执行都需要新的 help：
 
-# 心跳系统会在每天 8:00 自动触发提醒
-```
+1. help 返回完整说明和随机 help_token。
+2. run 携带 command 和 help_token。
+3. 加载器校验可信运行配置中的 thread_id、技能身份、说明路径及内容 SHA-256。
+4. 凭据 300 秒有效，在调用执行器之前原子消费；同一凭据并发重用最多放行一次。
 
-> 💡 提示：心跳任务在后台运行，即使不启动主程序也会执行（需单独运行心跳进程）。
+缺少凭据、跨会话/跨技能、过期、重放或说明变化都会拒绝执行。新的 help 替换本会话该技能的旧凭据；清缓存和进程重启也会撤销凭据。执行失败后应重新 help。
 
-### 5️⃣ 监控终端
+~~~python
+import re
+from cyberclaw.core.skill_loader import load_dynamic_skills
 
-在另一个终端运行：
-```bash
+# 先安装至少一个技能到 workspace/office/skills/<技能名>/
+skill = load_dynamic_skills()[0]
+config = {"configurable": {"thread_id": "demo-session"}}
+manual = skill.invoke({"mode": "help"}, config=config)
+token = re.search(r"help_token: ([A-Za-z0-9_-]+)", manual).group(1)
+
+result = skill.invoke(
+    {"mode": "run", "command": "echo {baseDir}", "help_token": token},
+    config=config,
+)
+print(result)
+~~~
+
+CLI 中由模型从工具结果读取凭据并填入下一次调用。升级后请重启 CLI；SDK 调用方必须提供 thread_id。没有会话配置时仍可阅读 help，但不会签发凭据。
+
+凭据证明相应会话获得了该版本说明，不证明模型理解正确、执行安全或用户已授权。该流程约束动态技能接口；内置 execute_office_shell 是单独的工具。完整迁移规则与限制见 [运行时修复说明](docs/RUNTIME_HARDENING.md)。
+
+## 技能安装与更新
+
+将技能说明及脚本放在 workspace/office/skills/<技能名>/ 下。例如：
+
+~~~text
+workspace/office/skills/
+└── my-skill/
+    ├── SKILL.md
+    └── scripts/
+        └── main.py
+~~~
+
+SKILL.md 可以包含 name、description 元数据及操作说明。命令中的 {baseDir} 会替换为相对于 office 的技能目录。
+
+支持读取 OpenClaw / Claude Code 风格的说明文件，但不自动实现两个生态的全部权限、依赖安装、钩子和运行时协议。脚本依赖与可用命令需要部署者准备。MCP 可通过第三方技能扩展；仓库没有独立的原生 MCP 会话客户端。
+
+- 元数据扫描缓存 60 秒；说明每次 help/run 读取并校验，最多 64 KiB，超限明确拒绝。
+- 内容缓存默认最多 50 条，凭据默认最多 1024 条。
+- 说明改动后旧工具对象也能读到新内容，旧凭据失效。
+- 新增、删除或改名后调用 reload_skills，并同步更新模型绑定与 ToolNode；CLI 可直接重启。
+- 重复技能名、技能与内置工具重名会报错。
+
+详见 [技能调用指南](docs/LAZY_LOADING_GUIDE.md) 与 [快速参考](docs/LAZY_LOADING_QUICKSTART.md)。
+
+## 13 个内置工具
+
+| 工具 | 用途 |
+| --- | --- |
+| get_current_time | 获取宿主本地时间 |
+| calculator | 基于 AST 白名单的算术求值 |
+| get_system_model_info | 读取环境中的模型配置 |
+| read_user_profile / save_user_profile | 读取或覆盖长期画像 |
+| schedule_task / list_scheduled_tasks | 创建或查询计划任务 |
+| delete_scheduled_task / modify_scheduled_task | 删除或修改计划任务 |
+| list_office_files / read_office_file | 列目录、读取文本 |
+| write_office_file | 新建、覆盖或追加文本 |
+| execute_office_shell | 校验后在 office 工作目录执行命令 |
+
+## 行为审计与监控
+
+埋点覆盖 llm_input、tool_call、tool_result、ai_message、system_action 五类事件：
+
+- llm_input 记录消息数；tool_call 记录工具与参数；tool_result 记录结果前 200 字符。
+- 工具审计参数及结果预览中的 help_token 会被遮盖。
+- 日志后台写入 logs/<thread_id>.jsonl；默认有界队列为 4096 条。
+- 队列满时丢弃新事件并增加 dropped_events；写入异常增加 write_errors。
+- 正常关闭会停止接收事件并排空队列，重复 shutdown 不会再次等待已退出线程。
+
+~~~bash
 cyberclaw monitor
-```
-
-![监控终端](docs/monitor.png)
-
----
-
-## 🏢 适用场景
-
-### 🔒 企业级应用
-- **合规审计** - 5 类事件审计日志，满足企业合规要求
-- **权限管控** - 沙盒隔离 + 路径拦截，防止越权操作
-- **任务自动化** - 心跳任务引擎，定时执行重复性工作
-- **知识沉淀** - 双水位记忆系统，持续学习组织偏好
-
-### 🧪 AI 研究与开发
-- **Agent 行为分析** - 完整记录 LLM 决策过程和工具调用链
-- **安全研究** - 两段式调用机制，研究 AI 安全边界
-- **调试友好** - JSONL 日志 + Rich 监控终端，快速定位问题
-- **可扩展架构** - 可插拔技能系统，快速验证新想法
-
-### 🖥️ 跨平台部署
-- **Windows** - 完整支持 PowerShell + CMD，路径自动适配
-- **Linux** - 原生支持所有发行版，完美兼容 Bash
-- **macOS** - 支持 zsh/bash，与 Unix 工具链无缝集成
-
-### 🛠️ 开发者工具
-- **本地开发助手** - 文件操作 + Shell 执行，自动化编码任务
-- **项目监控** - 实时监控 AI 行为，防止意外操作
-- **技能开发** - 支持自定义技能，快速集成新工具
-- **MCP 服务集成** - 连接外部 MCP 服务，扩展能力边界
-
-### 📚 教育与学习
-- **AI 智能体教学** - 透明展示 Agent 架构和决策流程
-- **Prompt 工程** - 观察不同 Prompt 对 AI 行为的影响
-- **安全实践** - 学习 AI 安全最佳实践和防护措施
-- **开源贡献** - 参与开源项目，积累实战经验
-
-### 🏠 个人效率工具
-- **智能日程管理** - 定时提醒 + 循环任务，解放双手
-- **文件自动化** - 批量处理文件，自动化工作流
-- **信息查询** - 集成搜索技能，快速获取信息
-- **个性化助手** - 记忆系统学习个人偏好，越用越顺手
-
----
-
-## 🏗️ 系统架构
-
-### 完整架构图
-
-![系统架构图](docs/architect.png)
-
-**架构说明**：
-
-- **输入层** (蓝色)：Heartbeat 心跳任务 + 用户输入 → Gateway 网关
-- **记忆层** (粉色)：上下文裁剪 + 长短期记忆管理
-- **智能决策层** (黄色)：Agent Loop + LLM 推理决策
-- **工具执行层** (紫色)：内置工具集 + 可插拔 Skills
-- **安全层** (橙色)：路径越权拦截 + 跨平台兼容
-- **透明监控层** (绿色)：记忆更新 + 工具决策 + 工具参数 + 调用结果
-- **输出层** (底部)：聊天终端 + 监控终端
-
-### 核心模块
-
-| 模块 | 文件 | 功能 |
-|------|------|------|
-| **Agent 循环** | `cyberclaw/core/agent.py` | LangGraph StateGraph，决策大脑 |
-| **技能加载** | `cyberclaw/core/skill_loader.py` | 动态加载 SKILL.md，两段式调用 |
-| **上下文管理** | `cyberclaw/core/context.py` | 消息修剪，双水位记忆 |
-| **内置工具** | `cyberclaw/core/tools/builtins.py` | 时间/计算/任务调度等 |
-| **沙盒工具** | `cyberclaw/core/tools/sandbox_tools.py` | 文件操作 + Shell 执行 |
-| **审计日志** | `cyberclaw/core/logger.py` | JSONL 格式事件记录 |
-| **心跳任务** | `cyberclaw/core/heartbeat.py` | 定时任务检查与触发 |
-
-### 项目结构
-
-```
-CyberClaw/
-├── cyberclaw/                    # 核心包
-│   ├── core/
-│   │   ├── agent.py              # Agent 循环
-│   │   ├── config.py             # 配置管理
-│   │   ├── context.py            # 上下文修剪
-│   │   ├── provider.py           # LLM 提供商适配
-│   │   ├── skill_loader.py       # 动态技能加载
-│   │   ├── logger.py             # 审计日志
-│   │   ├── heartbeat.py          # 心跳任务
-│   │   └── tools/
-│   │       ├── base.py           # 工具装饰器
-│   │       ├── builtins.py       # 内置工具
-│   │       └── sandbox_tools.py  # 沙盒工具
-│   └── __init__.py
-├── workspace/
-│   ├── office/                   # 沙盒工位
-│   │   ├── skills/               # 可插拔技能
-│   │   │   ├── weather/
-│   │   │   ├── skill-creator/
-│   │   │   └── ...
-│   │   └── .env                  # 环境变量
-│   ├── memory/
-│   │   └── user_profile.md       # 用户长期画像
-│   ├── state.sqlite3             # 对话历史数据库
-│   └── tasks.json                # 定时任务队列
-├── logs/
-│   └── local_geek_master.jsonl   # 审计日志
-├── docs/                         # 文档与架构图
-│   ├── architect.png             # 系统架构图
-│   ├── monitor.png               # 监控终端截图
-│   ├── welcome.png               # 欢迎界面
-│   ├── chat.png                  # 聊天界面
-│   ├── config.png                # 配置向导
-│   ├── memory.png                # 记忆系统
-│   └── context_cut.png           # 上下文裁剪
-├── entry/
-│   ├── main.py                   # 主程序入口
-│   ├── cli.py                    # CLI 配置向导
-│   └── monitor.py                # 监控终端
-├── tests/                        # 测试套件
-│   ├── test_agent.py
-│   ├── test_builtins.py
-│   ├── test_two_phase_skills.py  # 两阶段测试
-│   └── logs/                     # 测试报告
-├── setup.py
-├── .env                          # 环境配置（运行时创建）
-├── .env.example                  # 环境配置示例（复制此文件开始配置）
-└── README.md
-```
-
----
-
-## 📖 使用指南
-
-### 配置文件说明
-
-**`.env` 文件**：主配置文件，包含 API Key、模型设置等敏感信息。
-
-**`.env.example` 文件**：配置模板，包含所有可用配置项的说明和示例值。
-
-首次使用时，复制示例文件并修改：
-```bash
-cp .env.example .env
-```
-
-详细配置说明见 [快速开始 - 配置](#-配置) 部分。
-
-### 技能系统
-#### 安装技能
-
-**方法 1：直接复制**
-```bash
-cp -r /path/to/skill workspace/office/skills/
-```
-
-**方法 2：使用 skill-creator**
-```bash
-# 先安装 skill-creator 技能
-cd workspace/office/skills
-git clone https://github.com/.../skill-creator.git
-
-# 然后用自然语言让 CyberClaw 创建新技能
-> 帮我创建一个查询比特币价格的技能
-```
-
-**方法 3：使用 skill-vetter 检查安全性**
-```bash
-# 安装 skill-vetter
-cd workspace/office/skills
-git clone https://github.com/.../skill-vetter.git
-
-# 让 CyberClaw 检查技能安全性
-> 帮我检查一下 weather 技能是否安全
-```
-
-#### 技能规范
-
-每个技能包含 `SKILL.md`：
-
-````markdown
----
-name: weather
-description: 获取天气预报
----
-
-# Weather Skill
-
-## 功能
-获取全球城市的实时天气预报。
-
-## 命令示例
-```bash
-curl "wttr.in/Beijing?format=3"
-```
-
-## 参数
-- 城市名（必填）
-- 天数（可选）
-````
-
-### 定时任务
-
-```bash
-# 单次任务
-> 明天早上 9 点叫我起床
-
-# 循环任务
-> 每天早上 8 点提醒我喝水
-> 每周一上午 10 点开团队会议
-
-# 查看任务
-> 我都有哪些任务
-
-# 修改任务
-> 把 8 点的喝水提醒改成 9 点
-
-# 删除任务
-> 取消明天的会议提醒
-```
-
-### 高级用法
-
-#### 1. 使用监控器
-
-在另一个终端运行：
-```bash
-cyberclaw monitor
-```
-
-实时查看：
-- 🧠 LLM 输入
-- 💡 工具调用
-- 💻 工具结果
-- 🤖 AI 回复
-- ⚙️ 系统动作
-
-#### 2. 查看审计日志
-
-```bash
-# 实时监控
 tail -f logs/local_geek_master.jsonl
+~~~
 
-# 搜索特定事件
-grep "tool_call" logs/local_geek_master.jsonl | tail -20
-```
+![监控界面](docs/monitor.png)
 
-#### 3. 自定义用户画像
+这是用于观察和排查的本地结构化日志。输入未保存完整 prompt，结果有截断，崩溃或队列满可能丢事件；不能据此宣称“100% 可追溯”或完整回放。monitor 默认读取 CLI 固定会话日志，其他 thread_id 的文件需单独查看。
 
-编辑 `workspace/memory/user_profile.md`：
+## 执行与可靠性边界
 
-```markdown
-# 用户档案
+- 文件工具使用规范路径的父子关系校验，拒绝绝对路径、盘符路径、同前缀兄弟目录及已存在的越界符号链接。
+- Shell 采用命令白名单，过滤部分展开、重定向与解释器参数；执行超时设为 60 秒。超时不保证整棵子进程树停止，也没有独立资源配额。
+- Shell 仍使用宿主权限；office 只是工作目录。路径检查与命令过滤不能限制脚本内部的全部 I/O，不能替代容器、低权限账号或 OS 隔离。
+- 任务 JSON 通过临时文件、flush/fsync 和同目录原子替换更新，写失败保留旧文件；心跳写回失败不继续投递。
+- JSON 写回和内存队列入队之间仍存在崩溃窗口，尚无持久化领取、ACK 或幂等任务执行协议。
+- CLI 退出时先停止心跳生产者，再投递退出标记并排空队列。
 
-- **姓名**: Thor Allen
-- **职业**: 程序员
-- **偏好**: 
-  - 喜欢喝冰美式咖啡
-  - 常用 Python 写代码
-  - 每天 8 点起床
-- **特殊要求**:
-  - 回答要简洁
-  - 不要使用表情符号
-```
+## 评测口径
 
----
+历史 README / 实验材料记录了 20 组人工构造的工具选择场景：
 
-## 🧠 记忆系统
+| 指标 | 单阶段 | 双阶段 |
+| --- | --- | --- |
+| 历史安全命中率 | 10/20（50%） | 18/20（90%） |
+| 历史平均决策耗时 | 19.33 秒 | 23.88 秒 |
 
-### 双水位记忆架构
+50% → 90% 是 **提升 40 个百分点**；上述数字未在本次修复后重新测量，不能当作通用任务准确率。旧材料把双阶段的 2 例失败同时描述为“事故”和“安全中止”，所以不继续引用“P0 事故下降 80%”作为结论。
 
-![记忆系统](docs/memory.png)
+[历史实验脚本](tests/test_two_phase_skills.py) 使用模拟工具，评分未严格核对当前场景的目标工具，基线可见信息不同，异常耗时也没有完整纳入统计。它使用独立的模拟工具实现，不验证新的 help_token 协议。重新评测应逐场景核验工具和参数，区分错误执行、拒绝、超时与成功，保存模型版本、随机种子和原始轨迹。
 
-- **长期记忆**：`user_profile.md` Markdown 文件，存储用户偏好、职业、特殊要求
-- **短期记忆**：SQLite 数据库，存储完整对话历史
-- **自动摘要**：每 20 轮对话自动触发摘要，保留最近 10 轮
+[懒加载测量示例](examples/benchmark_lazy_loading.py) 只报告实际运行的加载/help 耗时，不再输出未经测量的固定性能增益。
 
-### 上下文裁剪
+## 测试
 
-![上下文裁剪](docs/context_cut.png)
+确定性测试不调用真实模型，建议使用临时工作区：
 
-当对话轮次超过阈值时：
-1. 系统消息始终保留
-2. 保留最近 N 轮完整对话
-3. 旧对话压缩为摘要
-4. 防止 Token 爆炸
+~~~bash
+CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
+CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
+~~~
 
-### 轮次记忆
+2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**93 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
 
-![轮次记忆](docs/turn_memory.png)
+主要新增测试：
 
-每个完整回合包含：
-- 用户消息 (HumanMessage)
-- AI 回复 (AIMessage)
-- 工具调用 (ToolMessage)
+- tests/test_runtime_guards.py：顺序校验、令牌隔离/过期/重放/并发、文档变化、真实图配置传递、路径及日志。
+- tests/test_task_storage_and_shutdown.py：原子写入失败、心跳投递边界、非法参数和退出排空。
 
----
+## 项目结构
 
-## 🧪 测试
+~~~text
+CyberClaw/
+├── cyberclaw/core/
+│   ├── agent.py          # 组装图、模型节点、摘要与审计埋点
+│   ├── context.py        # AgentState、消息 reducer、完整回合裁剪
+│   ├── skill_loader.py   # 技能发现、说明缓存、help 凭据与 run 校验
+│   ├── provider.py       # 模型工厂
+│   ├── config.py         # 工作目录、数据库和画像路径
+│   ├── logger.py         # 有界异步 JSONL 日志
+│   ├── heartbeat.py      # 到期任务检查、循环规则与投递
+│   ├── task_storage.py   # 任务 JSON 原子写入
+│   ├── bus.py            # 共享队列与生产者/消费者关闭顺序
+│   └── tools/
+│       ├── __init__.py   # 工具子包标记，确保 wheel 收录
+│       ├── base.py       # 工具装饰器
+│       ├── builtins.py   # 内置工具与注册表
+│       └── sandbox_tools.py # 文件操作、路径和 Shell 校验
+├── entry/
+│   ├── cli.py            # 命令分发、配置向导
+│   ├── main.py           # 交互循环、checkpoint、worker 与心跳
+│   └── monitor.py        # Rich 日志查看器
+├── examples/             # SDK 用法与局部性能测量
+├── tests/                # 确定性回归与独立模型实验脚本
+├── docs/                 # 运行时说明、技能指南、演示图片
+├── setup.py              # 包发现、依赖与 CLI 注册
+├── requirements.txt      # 运行依赖
+└── .env.example          # 本地配置模板
+~~~
 
-### 运行测试
-
-```bash
-# 运行所有测试
-python3 -m pytest tests/ -v
-
-# 运行特定测试
-python3 tests/test_two_phase_skills.py
-
-# 运行两阶段测试
-python3 -c "from tests.test_two_phase_skills import run_tests; run_tests()"
-```
-
-### 测试覆盖
-
-| 测试文件 | 测试内容 | 状态 |
-|---------|---------|------|
-| `test_agent.py` | Agent 循环 | ✅ 通过 |
-| `test_builtins.py` | 内置工具 | ✅ 通过 |
-| `test_context.py` | 上下文修剪 | ✅ 通过 |
-| `test_sandbox_tools.py` | 沙盒工具 | ✅ 通过 |
-| `test_two_phase_skills.py` | 两阶段调用 | ✅ 通过 |
-| `test_heartbeat.py` | 心跳任务 | ✅ 通过 |
-
-### 两阶段测试报告
-
-根据 `tests/logs/test_two_phase_skills.md` 的实验数据：
-
-| 指标 | 单阶段 | 两阶段 | 提升 |
-|------|--------|--------|------|
-| **安全命中率** | 50.0% | 90.0% | **+40%** |
-| **P0 级事故率** | 50.0% | 10.0% | **-80%** |
-| **平均决策耗时** | 19.33s | 23.88s | +23.5% |
-
-**结论**：两阶段架构用 23.5% 的时间开销，换来了**事故率从 50% 暴降至 0%**（实际破坏性执行为 0）。
-
----
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-### 开发环境
-
-```bash
-# 克隆项目
-git clone https://github.com/ttguy0707/CyberClaw.git
-cd CyberClaw
-
-# 创建虚拟环境
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安装开发依赖
-pip install -e ".[dev]"
-```
-
-### 提交规范
-
-- `feat:` 新功能
-- `fix:` 修复 bug
-- `docs:` 文档更新
-- `style:` 代码格式
-- `refactor:` 重构
-- `test:` 测试相关
-- `chore:` 构建/工具
-
----
-
-## 📄 许可证
-
-MIT License
-
----
-
-## 🙏 致谢
-
-- **[OpenClaw](https://github.com/openclaw/openclaw)** - 灵感来源与技能生态
-- **LangChain** - LLM 应用开发框架
-- **LangGraph** - 有状态 Agent 构建
-- **Rich** - 终端美化
-- **Prompt Toolkit** - 交互式命令行
-- **所有贡献者** - 感谢你们的贡献！
-
----
-
-## 📬 联系方式
-
-- **GitHub**: [@ttguy0707](https://github.com/ttguy0707)
-- **邮箱**: allen.wtyummy@gmail.com
-
----
-
-## ⭐ Star History
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)
-
----
-
-<div align="center">
-
-**👾 CyberClaw · 下一代透明智能体架构**
-
-Made with ❤️ by [@ttguy0707](https://github.com/ttguy0707)
-
-</div>
-
----
+运行时生成 workspace/state.sqlite3、workspace/tasks.json、workspace/memory/user_profile.md 和 office 等目录；这些数据不是随仓库提供的示例技能。
 
 <a id="english"></a>
 
+## English
 
-> 🤖 **What is your AI doing behind the scenes? CyberClaw makes every action visible.**
->
-> 💡 **Inspired by** [OpenClaw](https://github.com/openclaw/openclaw), CyberClaw focuses on transparency and controllability for AI agents.
+CyberClaw is a Python / LangGraph CLI agent inspired by OpenClaw. It combines a model/tool state graph, SQLite checkpoints, Markdown profiles, context summaries, pluggable skills, scheduled tasks and structured event logs.
 
----
+### Getting started
 
-## 📖 Introduction
+Use Python 3.10+, clone the repository, create a virtual environment and run:
 
-CyberClaw is an **enterprise-grade transparent and controllable agent** that redefines the trust boundary of AI systems:
-
-- **🔍 White-box decisions** -> 5-category event auditing, JSONL logs, and a Rich monitoring terminal make every action traceable
-- **🛡️ Zero-trust execution** -> two-phase invocation (`help` -> `run`) lets the agent read instructions before execution, reducing P0 incident risk by 80%
-- **🧠 Continuous learning** -> dual-watermark memory, combining a long-term profile with short-term summaries, learns your preferences over time
-- **⚡ Complex task orchestration** -> heartbeat tasks, pluggable skills, and MCP service integration automate repetitive work
-
-### 🔌 Skill Ecosystem Compatibility
-
-CyberClaw supports both **OpenClaw skills** and **Claude Code skills**, so you can reuse rich skill resources from both ecosystems without rebuilding them.
-
-### 🌟 Core Capabilities
-
-| Capability | Description | Benefit |
-|------|------|------|
-| **🧠 Dual-watermark memory** | Long-term profile + short-term summaries that continuously learn user preferences | Understands you better over time and avoids repeated questions |
-| **🔍 Full behavior auditing** | 5-category real-time event auditing, JSONL logs, and a Rich monitoring terminal | No more black boxes; every decision is traceable |
-| **🛡️ Zero-trust execution** | `help` -> `run` two-phase calls that read the manual before execution | Reduces P0 incident risk by 80% (50% -> 10%) |
-| **⏰ Heartbeat task engine** | Independent background process for scheduled tasks | Automates complex and repetitive tasks |
-| **🖥️ Cross-platform support** | Adaptive support for Unix and Windows, with LLM-selected commands | One codebase runs across platforms |
-
----
-
-## ✨ Features
-
-### 🧠 Intelligent Core
-
-- **Dual-watermark memory system**
-  - Long-term profile (`user_profile.md`): user preferences, occupation, and special requirements
-  - Recent summaries (SQLite): automatically summarizes every `MAX_TURNS` turns and keeps the latest `KEEP_TURNS` turns
-  - Context trimming: preserves key conversations and prevents token explosion
-
-- **Two-phase skill invocation**
-  - `mode='help'`: read the full instruction file (`SKILL.md`)
-  - `mode='run'`: execute the concrete operation
-  - Supports reconsideration: after reading the manual, the agent can choose another tool
-
-- **Transparent monitoring system**
-  - 5 audited event types: `llm_input`, `tool_call`, `tool_result`, `ai_message`, `system_action`
-  - JSONL log format with `tail -f` real-time monitoring
-  - Rich terminal UI with colors and panels for different event types
-
-- **Heartbeat task system**
-  - Independent background process checks the task queue every second
-  - Supports daily, weekly, and monthly recurring tasks
-  - Persistent task storage survives restarts
-
-### 🛡️ Security Sandbox
-
-- **Cross-platform path interception**
-  - Blocks unauthorized access on both Unix and Windows
-  - Forbids `..`, absolute paths, and user home directory access
-  - Restricts all operations to the `office/` workspace
-
-- **Shell command safety**
-  - Blocks dangerous commands with regex matching
-  - Enforces a 60-second timeout circuit breaker
-  - Runs commands non-interactively and requires flags such as `-y` when needed
-
-### 🖥️ Cross-platform Capabilities
-
-- **System information injection** - automatically detects the operating system and injects platform-specific context
-- **LLM-selected commands** - generates suitable commands based on the platform, such as PowerShell or Bash
-- **Path format compatibility** - automatically handles `/` and `\` path separators
-- **Environment variable adaptation** - reads and sets environment variables across platforms
-
-### 🔧 Built-in Tools
-
-| Tool | Function | Example |
-|------|------|------|
-| `get_current_time` | Get the current time | "What time is it now?" |
-| `calculator` | Math calculator | "What is 25 times 48?" |
-| `schedule_task` | Scheduled tasks and alarms | "Remind me to drink water every morning at 8" |
-| `list_scheduled_tasks` | List tasks | "What tasks do I have?" |
-| `delete_scheduled_task` | Delete a task | "Cancel tomorrow's meeting reminder" |
-| `modify_scheduled_task` | Modify a task | "Move the 8 o'clock meeting to 9" |
-| `get_system_model_info` | Get model information | "What model are you?" |
-| `save_user_profile` | Update user profile | "Remember that I like iced Americano" |
-| `list_office_files` | List files | "Show me what is in office" |
-| `read_office_file` | Read a file | "Read readme.txt" |
-| `write_office_file` | Write a file | "Create test.py" |
-| `execute_office_shell` | Run a shell command | "Run python test.py" |
-
-### 🎯 Pluggable Skills
-
-- **Dynamic loading**: automatically scans `workspace/office/skills/`
-- **SKILL.md convention**: each skill contains a complete instruction manual
-- **Compatible with OpenClaw and Claude Code skills**: reuse skills from both ecosystems directly
-- **Recommended skills**:
-  - `skill-creator`: create skills with natural language through CyberClaw
-  - `skill-vetter`: check skill safety
-  - `mcporter`: connect external MCP (Model Context Protocol) services
-  - `mcp-builder`: build your own MCP services
-  - `tavily-search`: AI-optimized web search
-  - `weather`: weather lookup
-
----
-
-## 🚀 Quick Start
-
-### 1️⃣ Installation
-
-```bash
-# Clone the project
-git clone https://github.com/ttguy0707/CyberClaw.git
-cd CyberClaw
-
-# Install dependencies and register the CLI in one step
-pip install -e .
-```
-
-> 💡 **Virtual environment recommended**:
-> ```bash
-> # Create a virtual environment
-> python3 -m venv venv
-> source venv/bin/activate  # Windows: venv\Scripts\activate
->
-> # Install the project. Dependencies from requirements.txt are installed automatically.
-> pip install -e .
-> ```
->
-> After installation, the `cyberclaw` command is available from any directory.
-
-### 2️⃣ Configuration
-
-There are two configuration methods: the **automatic setup wizard** (recommended) and **manual configuration**.
-
-#### Option 1: Automatic Setup Wizard (Recommended)
-
-```bash
-# Start the interactive configuration wizard
+~~~bash
+python -m pip install -e .
 cyberclaw config
-```
-
-The wizard guides you through:
-1. Choosing a model provider (OpenAI / Anthropic / Alibaba Cloud / Tencent / Z.AI / Ollama)
-2. Entering an API key
-3. Configuring the Base URL (optional)
-4. **Automatically testing the connection** to verify the configuration
-
-![Configuration Wizard](docs/config.png)
-
-#### Option 2: Manual Configuration
-
-```bash
-# Copy the example configuration file
-cp .env.example .env
-
-# Edit the configuration file
-vim .env  # Or use your preferred editor
-```
-
-Edit `.env` and configure the required parameters:
-
-```bash
-# Model provider
-DEFAULT_PROVIDER=aliyun
-DEFAULT_MODEL=glm-5
-
-# API Key. Choose the corresponding key for your provider.
-OPENAI_API_KEY=sk-your-api-key-here
-
-# Base URL. Optional; configure it when using a proxy or compatible endpoint.
-OPENAI_API_BASE=https://coding.dashscope.aliyuncs.com/v1
-```
-
-**Configuration reference:**
-- `DEFAULT_PROVIDER`: model provider (`openai`, `anthropic`, `aliyun`, `tencent`, `z.ai`, `ollama`)
-- `DEFAULT_MODEL`: model name, such as `gpt-4o-mini`, `glm-5`, or `qwen-max`
-- `OPENAI_API_KEY`: API key for OpenAI or compatible APIs
-- `ANTHROPIC_API_KEY`: Anthropic API key
-- `OPENAI_API_BASE`: Base URL for compatible APIs such as Alibaba Cloud or Tencent Cloud
-- `OLLAMA_BASE_URL`: local Ollama service URL, defaulting to `http://localhost:11434`
-
-> 💡 **Workspace configuration**: the workspace path is initialized in code and defaults to the `workspace` folder in the project root. You do not need to configure it in `.env`. Set the `CYBERCLAW_WORKSPACE` environment variable only when you need a custom workspace path.
-
-> 💡 Tip: after configuration, run `cyberclaw run` to test whether chat connectivity works.
-
-### 3️⃣ Run
-
-```bash
-# Start the main program
 cyberclaw run
-```
-
-![Welcome Screen](docs/welcome.png)
-
-### 4️⃣ Basic Usage
-
-After startup, CyberClaw enters the interactive chat interface:
-
-![Chat Interface](docs/chat.png)
-
-**Common command examples:**
-
-| Type | Example Command | Description |
-|------|----------|------|
-| ⏰ Time query | `What time is it now?` | Get the current time |
-| 🧮 Math | `Calculate 25 times 48` | Use the calculator tool |
-| ⏲️ Scheduled task | `Remind me to drink water every morning at 8` | Create a recurring task |
-| 📋 List tasks | `What tasks do I have?` | View the task list |
-| ✏️ Modify task | `Move the 8 o'clock water reminder to 9` | Modify an existing task |
-| ❌ Delete task | `Cancel tomorrow's meeting reminder` | Delete a task |
-| 📁 File operations | `Show me the files in office` | List workspace files |
-| 📖 Read file | `Read readme.txt` | Read file content |
-| 📝 Create file | `Create test.py` | Write a new file |
-| 💻 Shell command | `Run python test.py` | Execute a shell command |
-| 🚪 Exit | `/exit` | Exit the program |
-
-### ⏰ Heartbeat Task System
-
-CyberClaw includes a heartbeat task system that automatically executes scheduled tasks in the background:
-
-- **Automatic triggering**: the heartbeat process checks the task queue every second and triggers tasks on time
-- **Recurring tasks**: supports daily, weekly, and monthly recurrence
-- **Persistent tasks**: tasks are stored in `workspace/tasks.json` and survive restarts
-- **Real-time monitoring**: run `cyberclaw monitor` to view task execution logs
-
-**Heartbeat task example:**
-```bash
-# Create a recurring task
-> Remind me to drink water every morning at 8
-✅ Task added to queue | Recurrence: daily | First run: 2026-04-07 08:00:00
-
-# The heartbeat system triggers the reminder at 8:00 every day
-```
-
-> 💡 Tip: heartbeat tasks run in the background and can execute even when the main program is not running, as long as the heartbeat process is started separately.
-
-### 5️⃣ Monitoring Terminal
-
-Run this in another terminal:
-```bash
+# In another terminal:
 cyberclaw monitor
-```
+~~~
 
-![Monitoring Terminal](docs/monitor.png)
+Configure the selected provider and its credentials using the wizard or .env.example. Anthropic and Ollama adapters require additional langchain-anthropic and langchain-community packages respectively. Actual provider API compatibility was not tested in this regression run.
 
----
+### Enforced help → run
 
-## 🏢 Use Cases
+A dynamic skill's help response includes a one-use help_token. Each run requires that token and a trusted runtime thread_id. The loader binds the token to the session, skill and manual content hash, expires it after 300 seconds, and consumes it atomically before dispatch. Missing, stale, cross-session and replayed tokens are rejected. Restart the CLI after upgrading; SDK callers must supply session configuration.
 
-### 🔒 Enterprise Applications
-- **Compliance auditing** - 5-category event audit logs for enterprise compliance requirements
-- **Permission control** - sandbox isolation and path interception prevent unauthorized operations
-- **Task automation** - heartbeat task engine executes repetitive work on schedule
-- **Knowledge accumulation** - dual-watermark memory continuously learns organizational preferences
+This proves that the session received the manual version, not that the model understood it or that execution is authorized. Built-in Shell is a separate capability. See [runtime and migration notes](docs/RUNTIME_HARDENING.md).
 
-### 🧪 AI Research and Development
-- **Agent behavior analysis** - fully records LLM decision processes and tool-call chains
-- **Security research** - two-phase invocation helps study AI safety boundaries
-- **Debug-friendly workflow** - JSONL logs and a Rich monitoring terminal make issues easier to locate
-- **Extensible architecture** - pluggable skills make it easy to validate new ideas
+### Current behavior and limits
 
-### 🖥️ Cross-platform Deployment
-- **Windows** - full support for PowerShell and CMD with automatic path adaptation
-- **Linux** - native support for all distributions and Bash compatibility
-- **macOS** - supports zsh/bash and integrates naturally with Unix toolchains
+- The main agent trims at 40 user turns, keeps the latest 10 and merges older content into an LLM summary.
+- AsyncSqliteSaver persists graph state. The global Markdown profile is not isolated by user.
+- Five event types are logged through a bounded queue. Truncation, drops and crashes prevent a claim of complete audit delivery.
+- Heartbeat runs every 10 seconds in the CLI process. It stops when the CLI exits.
+- Task JSON writes are atomic, but durable queue handoff and exactly-once side effects are not implemented.
+- File/path checks and a Shell allowlist reduce accidental misuse. Execution still uses host permissions and is not an OS sandbox.
+- OpenClaw / Claude Code style skill manuals can be loaded; full runtime compatibility and native MCP sessions are not provided.
 
-### 🛠️ Developer Tools
-- **Local development assistant** - file operations and shell execution for automated coding tasks
-- **Project monitoring** - monitor AI behavior in real time to prevent unexpected operations
-- **Skill development** - supports custom skills for fast tool integration
-- **MCP service integration** - connects external MCP services to extend capability boundaries
+### Validation and historical metrics
 
-### 📚 Education and Learning
-- **AI agent teaching** - transparently demonstrates agent architecture and decision flows
-- **Prompt engineering** - observe how different prompts affect AI behavior
-- **Security practice** - learn AI safety best practices and protective measures
-- **Open-source contribution** - participate in open-source development and gain practical experience
+On 2026-09-09, 93 deterministic unittest cases, the standalone lazy-loading test and an isolated wheel installation/import check passed under Ubuntu-24.04 / WSL2 with Python 3.12.3. Model and execution calls were replaced by test doubles.
 
-### 🏠 Personal Productivity
-- **Smart schedule management** - reminders and recurring tasks reduce manual effort
-- **File automation** - batch-process files and automate workflows
-- **Information lookup** - integrate search skills for quick information retrieval
-- **Personalized assistant** - memory learns personal preferences and improves over time
+Historical materials reported 10/20 versus 18/20 safe hits, an increase of 40 percentage points, with average latency of 19.33 versus 23.88 seconds. These simulated results have scoring and baseline limitations and have not been remeasured after this change. They are not production incident rates or general tool-call accuracy.
 
----
+## 贡献与许可证 / Contributing and license
 
-## 🏗️ System Architecture
+欢迎提交 Issue 和 Pull Request。涉及执行协议的改动请提供拒绝路径与成功路径测试，文档应区分当前实现、历史实验和计划能力。
 
-### Full Architecture Diagram
+本项目采用 [MIT License](LICENSE)。感谢 OpenClaw、LangGraph、LangChain、Rich 及项目贡献者。
 
-![System Architecture](docs/architect.png)
-
-**Architecture overview**:
-
-- **Input layer** (blue): heartbeat tasks + user input -> gateway
-- **Memory layer** (pink): context trimming + long-term and short-term memory management
-- **Intelligent decision layer** (yellow): Agent Loop + LLM reasoning and decisions
-- **Tool execution layer** (purple): built-in tools + pluggable skills
-- **Security layer** (orange): path access interception + cross-platform compatibility
-- **Transparent monitoring layer** (green): memory updates + tool decisions + tool parameters + call results
-- **Output layer** (bottom): chat terminal + monitoring terminal
-
-### Core Modules
-
-| Module | File | Function |
-|------|------|------|
-| **Agent loop** | `cyberclaw/core/agent.py` | LangGraph StateGraph and decision engine |
-| **Skill loading** | `cyberclaw/core/skill_loader.py` | Dynamically loads SKILL.md with two-phase invocation |
-| **Context management** | `cyberclaw/core/context.py` | Message trimming and dual-watermark memory |
-| **Built-in tools** | `cyberclaw/core/tools/builtins.py` | Time, calculation, task scheduling, and more |
-| **Sandbox tools** | `cyberclaw/core/tools/sandbox_tools.py` | File operations and shell execution |
-| **Audit logging** | `cyberclaw/core/logger.py` | JSONL event logging |
-| **Heartbeat tasks** | `cyberclaw/core/heartbeat.py` | Scheduled task checking and triggering |
-
-### Project Structure
-
-```
-CyberClaw/
-├── cyberclaw/                    # Core package
-│   ├── core/
-│   │   ├── agent.py              # Agent loop
-│   │   ├── config.py             # Configuration management
-│   │   ├── context.py            # Context trimming
-│   │   ├── provider.py           # LLM provider adapters
-│   │   ├── skill_loader.py       # Dynamic skill loading
-│   │   ├── logger.py             # Audit logging
-│   │   ├── heartbeat.py          # Heartbeat tasks
-│   │   └── tools/
-│   │       ├── base.py           # Tool decorator
-│   │       ├── builtins.py       # Built-in tools
-│   │       └── sandbox_tools.py  # Sandbox tools
-│   └── __init__.py
-├── workspace/
-│   ├── office/                   # Sandbox workspace
-│   │   ├── skills/               # Pluggable skills
-│   │   │   ├── weather/
-│   │   │   ├── skill-creator/
-│   │   │   └── ...
-│   │   └── .env                  # Environment variables
-│   ├── memory/
-│   │   └── user_profile.md       # Long-term user profile
-│   ├── state.sqlite3             # Conversation history database
-│   └── tasks.json                # Scheduled task queue
-├── logs/
-│   └── local_geek_master.jsonl   # Audit logs
-├── docs/                         # Documentation and diagrams
-│   ├── architect.png             # System architecture diagram
-│   ├── monitor.png               # Monitoring terminal screenshot
-│   ├── welcome.png               # Welcome screen
-│   ├── chat.png                  # Chat interface
-│   ├── config.png                # Configuration wizard
-│   ├── memory.png                # Memory system
-│   └── context_cut.png           # Context trimming
-├── entry/
-│   ├── main.py                   # Main program entry
-│   ├── cli.py                    # CLI configuration wizard
-│   └── monitor.py                # Monitoring terminal
-├── tests/                        # Test suite
-│   ├── test_agent.py
-│   ├── test_builtins.py
-│   ├── test_two_phase_skills.py  # Two-phase tests
-│   └── logs/                     # Test reports
-├── setup.py
-├── .env                          # Runtime environment configuration
-├── .env.example                  # Example environment configuration
-└── README.md
-```
-
----
-
-## 📖 User Guide
-
-### Configuration Files
-
-**`.env` file**: the main configuration file that contains sensitive information such as API keys and model settings.
-
-**`.env.example` file**: configuration template with descriptions and example values for all available options.
-
-For first-time setup, copy the example file and modify it:
-```bash
-cp .env.example .env
-```
-
-See [Quick Start - Configuration](#2️⃣-configuration) for detailed configuration instructions.
-
-### Skill System
-
-#### Installing Skills
-
-**Method 1: Direct copy**
-```bash
-cp -r /path/to/skill workspace/office/skills/
-```
-
-**Method 2: Use skill-creator**
-```bash
-# Install the skill-creator skill first
-cd workspace/office/skills
-git clone https://github.com/.../skill-creator.git
-
-# Then ask CyberClaw to create a new skill with natural language
-> Create a skill for querying Bitcoin prices
-```
-
-**Method 3: Use skill-vetter for safety checks**
-```bash
-# Install skill-vetter
-cd workspace/office/skills
-git clone https://github.com/.../skill-vetter.git
-
-# Ask CyberClaw to check skill safety
-> Check whether the weather skill is safe
-```
-
-#### Skill Convention
-
-Each skill contains a `SKILL.md` file:
-
-````markdown
----
-name: weather
-description: Get weather forecasts
----
-
-# Weather Skill
-
-## Function
-Get real-time weather forecasts for cities worldwide.
-
-## Command Example
-```bash
-curl "wttr.in/Beijing?format=3"
-```
-
-## Parameters
-- City name (required)
-- Number of days (optional)
-````
-
-### Scheduled Tasks
-
-```bash
-# One-time task
-> Wake me up tomorrow morning at 9
-
-# Recurring tasks
-> Remind me to drink water every morning at 8
-> Hold a team meeting every Monday at 10 AM
-
-# View tasks
-> What tasks do I have?
-
-# Modify a task
-> Move the 8 o'clock water reminder to 9
-
-# Delete a task
-> Cancel tomorrow's meeting reminder
-```
-
-### Advanced Usage
-
-#### 1. Use the Monitor
-
-Run this in another terminal:
-```bash
-cyberclaw monitor
-```
-
-View in real time:
-- 🧠 LLM input
-- 💡 Tool calls
-- 💻 Tool results
-- 🤖 AI replies
-- ⚙️ System actions
-
-#### 2. View Audit Logs
-
-```bash
-# Real-time monitoring
-tail -f logs/local_geek_master.jsonl
-
-# Search for specific events
-grep "tool_call" logs/local_geek_master.jsonl | tail -20
-```
-
-#### 3. Customize the User Profile
-
-Edit `workspace/memory/user_profile.md`:
-
-```markdown
-# User Profile
-
-- **Name**: Thor Allen
-- **Occupation**: Programmer
-- **Preferences**:
-  - Likes iced Americano
-  - Often writes code in Python
-  - Gets up at 8 every day
-- **Special requirements**:
-  - Keep answers concise
-  - Do not use emojis
-```
-
----
-
-## 🧠 Memory System
-
-### Dual-watermark Memory Architecture
-
-![Memory System](docs/memory.png)
-
-- **Long-term memory**: `user_profile.md`, a Markdown file that stores user preferences, occupation, and special requirements
-- **Short-term memory**: SQLite database that stores complete conversation history
-- **Automatic summarization**: triggers every 20 conversation turns and keeps the latest 10 turns
-
-### Context Trimming
-
-![Context Trimming](docs/context_cut.png)
-
-When the number of conversation turns exceeds the threshold:
-1. System messages are always retained
-2. The latest N full conversation turns are retained
-3. Older conversations are compressed into summaries
-4. Token explosion is prevented
-
-### Turn Memory
-
-![Turn Memory](docs/turn_memory.png)
-
-Each complete turn contains:
-- User message (`HumanMessage`)
-- AI response (`AIMessage`)
-- Tool call (`ToolMessage`)
-
----
-
-## 🧪 Testing
-
-### Run Tests
-
-```bash
-# Run all tests
-python3 -m pytest tests/ -v
-
-# Run a specific test
-python3 tests/test_two_phase_skills.py
-
-# Run two-phase tests
-python3 -c "from tests.test_two_phase_skills import run_tests; run_tests()"
-```
-
-### Test Coverage
-
-| Test File | Coverage | Status |
-|---------|---------|------|
-| `test_agent.py` | Agent loop | ✅ Passing |
-| `test_builtins.py` | Built-in tools | ✅ Passing |
-| `test_context.py` | Context trimming | ✅ Passing |
-| `test_sandbox_tools.py` | Sandbox tools | ✅ Passing |
-| `test_two_phase_skills.py` | Two-phase invocation | ✅ Passing |
-| `test_heartbeat.py` | Heartbeat tasks | ✅ Passing |
-
-### Two-phase Test Report
-
-Based on the experimental data in `tests/logs/test_two_phase_skills.md`:
-
-| Metric | Single-phase | Two-phase | Improvement |
-|------|--------|--------|------|
-| **Safety hit rate** | 50.0% | 90.0% | **+40%** |
-| **P0 incident rate** | 50.0% | 10.0% | **-80%** |
-| **Average decision latency** | 19.33s | 23.88s | +23.5% |
-
-**Conclusion**: the two-phase architecture trades 23.5% more time for an **incident-rate drop from 50% to 0%** in actual destructive execution.
-
----
-
-## 🤝 Contributing
-
-Issues and pull requests are welcome.
-
-### Development Environment
-
-```bash
-# Clone the project
-git clone https://github.com/ttguy0707/CyberClaw.git
-cd CyberClaw
-
-# Create a virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install development dependencies
-pip install -e ".[dev]"
-```
-
-### Commit Convention
-
-- `feat:` new feature
-- `fix:` bug fix
-- `docs:` documentation update
-- `style:` code style
-- `refactor:` refactoring
-- `test:` test-related changes
-- `chore:` build or tooling changes
-
----
-
-## 📄 License
-
-MIT License
-
----
-
-## 🙏 Acknowledgements
-
-- **[OpenClaw](https://github.com/openclaw/openclaw)** - inspiration and skill ecosystem
-- **LangChain** - LLM application development framework
-- **LangGraph** - stateful agent construction
-- **Rich** - terminal styling
-- **Prompt Toolkit** - interactive command line
-- **All contributors** - thank you for your contributions!
-
----
-
-## 📬 Contact
-
-- **GitHub**: [@ttguy0707](https://github.com/ttguy0707)
-- **Email**: allen.wtyummy@gmail.com
-
----
-
-## ⭐ Star History
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)
-
----
-
-<div align="center">
-
-**👾 CyberClaw · Next-Gen Transparent Agent Architecture**
-
-Made with ❤️ by [@ttguy0707](https://github.com/ttguy0707)
-
-</div>
+[![Star History](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)

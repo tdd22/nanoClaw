@@ -14,16 +14,16 @@ def _get_safe_path(relative_path: str) -> str:
     将模型传入的相对路径转换为绝对路径，并死死检查它是否越界！
     如果模型尝试传入 "../../etc/passwd"，这里会直接把它拦截。
     """
-    # 将 OFFICE_DIR 转化为标准绝对路径
-    base_dir = os.path.abspath(OFFICE_DIR)
-    # 将目标路径转化为绝对路径
-    target_path = os.path.abspath(os.path.join(base_dir, relative_path))
+    from pathlib import Path
+    import ntpath
+    if os.path.isabs(relative_path) or ntpath.isabs(relative_path) or ntpath.splitdrive(relative_path)[0]:
+        raise PermissionError("仅允许 office 内的相对路径")
+    base_dir = Path(OFFICE_DIR).resolve()
+    target = (base_dir / relative_path).resolve()
+    if not target.is_relative_to(base_dir):
+        raise PermissionError(f"越权拦截：路径 {relative_path!r} 位于 office 之外")
+    return str(target)
 
-    # 核心防御：目标路径必须以 OFFICE_DIR 开头！
-    if not target_path.startswith(base_dir):
-        raise PermissionError(f"越权拦截：你试图访问沙盒外的路径 '{relative_path}'！你只能在 office 工位内活动。")
-
-    return target_path
 
 
 # ============ 命令白名单（P0-1/P0-3：正则黑名单 -> 结构化校验） ============
@@ -135,8 +135,10 @@ def _validate_segment(segment: str):
     if not tokens:
         return
 
-    # 首 token 可能带路径前缀（./run.sh / skills/x/y.py），只取文件名比对
+    # 命令必须使用白名单中的裸名称；不接受可替换二进制的路径前缀
     head = tokens[0]
+    if any(separator in head for separator in ("/", "\\")) or ":" in head:
+        raise PermissionError("命令名不得携带路径前缀")
     head_name = os.path.basename(head.replace("\\", "/").strip('"\''))
 
     if head_name.lower() not in _ALLOWED_COMMANDS:
@@ -238,7 +240,7 @@ def read_office_file(filepath: str) -> str:
             return f"文件不存在：{filepath}"
         
         with open(target_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read(10001)
             # 防爆截断：防止读取几个 G 的日志把 Token 撑爆
             if len(content) > 10000:
                 return content[:10000] + "\n\n...[内容过长，已被安全截断]..."

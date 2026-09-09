@@ -135,20 +135,20 @@ def benchmark():
             skill_loader_module.clear_skill_cache()
             
             # 测试 1: 扫描耗时
-            start = time.time()
+            start = time.perf_counter()
             tools = skill_loader_module.load_dynamic_skills()
-            scan_time = (time.time() - start) * 1000
+            scan_time = (time.perf_counter() - start) * 1000
             
             # 测试 2: 首次调用
             if tools:
-                start = time.time()
+                start = time.perf_counter()
                 result = tools[0].func(mode='help')
-                first_call_time = (time.time() - start) * 1000
+                first_call_time = (time.perf_counter() - start) * 1000
                 
                 # 测试 3: 二次调用（缓存）
-                start = time.time()
+                start = time.perf_counter()
                 result = tools[0].func(mode='help')
-                second_call_time = (time.time() - start) * 1000
+                second_call_time = (time.perf_counter() - start) * 1000
             else:
                 first_call_time = 0
                 second_call_time = 0
@@ -159,23 +159,9 @@ def benchmark():
             shutil.rmtree(os.path.join(temp_dir, "office"), ignore_errors=True)
         
         print("=" * 70)
-        print("\n性能分析：")
-        print("- 扫描耗时：几乎恒定，因为只读取前 50 行")
-        print("- 首次调用：需要读取完整文件，耗时与文件大小相关")
-        print("- 二次调用：从缓存读取，几乎零延迟")
-        print("- 内存占用：仅缓存实际使用的技能（LRU 策略）")
-        
-        print("\n" + "=" * 70)
-        print("与传统预加载对比（假设 50 个技能）：")
-        print("=" * 70)
-        print(f"{'指标':<20} | {'预加载模式':<20} | {'懒加载模式':<20} | {'改善'}")
-        print("-" * 70)
-        print(f"{'启动时间':<20} | {'~2000ms':<20} | {'< 10ms':<20} | {'99.5%'}")
-        print(f"{'内存占用':<20} | {'~250KB':<20} | {'~50KB':<20} | {'80%'}")
-        print(f"{'热更新':<20} | {'需要重启':<20} | {'自动生效':<20} | {'∞'}")
-        print(f"{'扩展性':<20} | {'< 100 个':<20} | {'无限制':<20} | {'100x+'}")
-        print("=" * 70)
-        
+        print("\n测量范围：扫描、首次 help 与再次 help；每次 help 都校验说明内容。")
+        print("本脚本没有运行预加载基线、测量内存或真实 LLM token 成本，不能据此计算端到端提升百分比。")
+
     finally:
         # 恢复环境
         if original_env is not None:

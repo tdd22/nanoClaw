@@ -13,7 +13,7 @@ setup(
     name="cyberclaw",
     version="1.0.0",
     packages=find_packages(),
-    py_modules=["cli"], 
+    python_requires=">=3.10",
     install_requires=parse_requirements('requirements.txt'),
     entry_points={
         "console_scripts": [
