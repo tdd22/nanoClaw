@@ -10,10 +10,10 @@ import unittest
 from unittest.mock import patch
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.prebuilt import ToolNode
-import cyberclaw.core.skill_loader as skills
-from cyberclaw.core.logger import JSONLEventLogger
-from cyberclaw.core.tools import sandbox_tools
-from cyberclaw.core.context import trim_context_messages
+import nanoclaw.core.skill_loader as skills
+from nanoclaw.core.logger import JSONLEventLogger
+from nanoclaw.core.tools import sandbox_tools
+from nanoclaw.core.context import trim_context_messages
 
 class SkillGateTests(unittest.TestCase):
     def setUp(self):
@@ -165,7 +165,7 @@ class SkillGateTests(unittest.TestCase):
 
     def test_real_toolnode_propagates_config_and_gate(self):
         from langgraph.graph import StateGraph, START, END
-        from cyberclaw.core.context import AgentState
+        from nanoclaw.core.context import AgentState
         graph = StateGraph(AgentState)
         graph.add_node("tools", ToolNode([self.tool]))
         graph.add_edge(START, "tools")
@@ -182,7 +182,7 @@ class SkillGateTests(unittest.TestCase):
         self.assertEqual(result.content, "EXECUTED")
 
     def test_full_agent_loop_with_fake_model(self):
-        from cyberclaw.core.agent import create_agent_app
+        from nanoclaw.core.agent import create_agent_app
         class FakeModel:
             def bind_tools(inner, tools):
                 return inner
@@ -198,13 +198,13 @@ class SkillGateTests(unittest.TestCase):
                     return AIMessage(content="Done")
                 return AIMessage(content="", tool_calls=[{"name": "demo", "args": args,
                     "id": "call-"+str(len(tool_messages)), "type": "tool_call"}])
-        with patch("cyberclaw.core.agent.get_provider", return_value=FakeModel()), patch("cyberclaw.core.agent.MEMORY_DIR", str(self.root)):
+        with patch("nanoclaw.core.agent.get_provider", return_value=FakeModel()), patch("nanoclaw.core.agent.MEMORY_DIR", str(self.root)):
             app = create_agent_app(tools=[self.tool])
             result = app.invoke({"messages": [HumanMessage(content="test")]}, config=self.config)
         self.assertEqual(result["messages"][-1].content, "Done")
         self.shell.assert_called_once()
         import asyncio
-        with patch("cyberclaw.core.agent.MEMORY_DIR", str(self.root)):
+        with patch("nanoclaw.core.agent.MEMORY_DIR", str(self.root)):
             result = asyncio.run(app.ainvoke({"messages": [HumanMessage(content="async test")]}, config=self.config))
         self.assertEqual(result["messages"][-1].content, "Done")
         self.assertEqual(self.shell.call_count, 2)

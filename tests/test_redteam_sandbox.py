@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from cyberclaw.core.tools.sandbox_tools import execute_office_shell
+from nanoclaw.core.tools.sandbox_tools import execute_office_shell
 
 
 # 真绕过组:字符级正则看不见 shell 展开后的真实路径,旧实现预期放行(红)

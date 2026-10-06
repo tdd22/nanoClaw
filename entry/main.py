@@ -13,10 +13,10 @@ from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.styles import Style
 from prompt_toolkit.application import get_app
 
-from cyberclaw.core.agent import create_agent_app
-from cyberclaw.core.config import DB_PATH
-from cyberclaw.core.bus import task_queue, stop_workers
-from cyberclaw.core.heartbeat import pacemaker_loop
+from nanoclaw.core.agent import create_agent_app
+from nanoclaw.core.config import DB_PATH
+from nanoclaw.core.bus import task_queue, stop_workers
+from nanoclaw.core.heartbeat import pacemaker_loop
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -54,7 +54,7 @@ def print_banner():
  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝
 {RESET}"""
 
-    sub_title = f"{WHITE}{BOLD} 👾 Welcome to the {PURPLE}{BOLD}CyberClaw{RESET}{WHITE}{BOLD} !  {RESET}"
+    sub_title = f"{WHITE}{BOLD} 👾 Welcome to the {PURPLE}{BOLD}NanoClaw{RESET}{WHITE}{BOLD} !  {RESET}"
 
     quotes = [
         "It works on my machine.",
@@ -72,7 +72,7 @@ def print_banner():
 
     tip = (
         f"{PURPLE} ✦ {RESET}"
-        f"{SILVER}{PURPLE}{BOLD}CyberClaw{RESET} 已完成启动。输入命令开始，输入 {PURPLE}/exit{RESET}{SILVER} 退出。{RESET}\n"
+        f"{SILVER}{PURPLE}{BOLD}NanoClaw{RESET} 已完成启动。输入命令开始，输入 {PURPLE}/exit{RESET}{SILVER} 退出。{RESET}\n"
     )
 
     print(logo)
@@ -100,7 +100,8 @@ async def async_main():
 
     async with AsyncSqliteSaver.from_conn_string(DB_PATH) as memory:
         app = create_agent_app(provider_name=current_provider, model_name=current_model, checkpointer=memory)
-        config = {"configurable": {"thread_id": "local_geek_master"}}
+        session_id = uuid4().hex
+        config = {"configurable": {"thread_id": "local_geek_master", "session_id": session_id}}
 
         class SpinnerState:
             action_words = [
@@ -236,12 +237,12 @@ async def async_main():
                     cprint(f"\033[48;2;38;38;38m\033[38;5;255m{padded_bubble}\033[0m\n")
                     
                     if user_input.lower() in ["/exit", "/quit"]:
-                        cprint("  \033[38;5;141m✦ 记忆已固化，CyberClaw 进入休眠。\033[0m")
+                        cprint("  \033[38;5;141m✦ 记忆已固化，NanoClaw 进入休眠。\033[0m")
                         break
                     await task_queue.put(user_input)
 
                 except (KeyboardInterrupt, EOFError):
-                    cprint("\n  \033[38;5;141m✦ 强制中断，CyberClaw 进入休眠。\033[0m")
+                    cprint("\n  \033[38;5;141m✦ 强制中断，NanoClaw 进入休眠。\033[0m")
                     break
 
             redraw_task.cancel() 

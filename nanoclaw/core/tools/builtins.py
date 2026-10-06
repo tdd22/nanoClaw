@@ -1,5 +1,5 @@
 from datetime import datetime
-from .base import cyberclaw_tool, CyberClawBaseTool
+from .base import nanoclaw_tool, NanoClawBaseTool
 import ast
 import operator
 import os
@@ -66,10 +66,10 @@ def _safe_eval_expression(expression: str) -> float:
     return _eval_node(tree)
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def get_system_model_info() -> str:
     """
-    获取当前 CyberClaw 正在运行的底层大模型（LLM）型号和提供商信息。
+    获取当前 NanoClaw 正在运行的底层大模型（LLM）型号和提供商信息。
     当用户询问“你是基于什么模型”、“你的底层大模型是什么”、“你是GPT还是GLM”、“现在用的什么模型”等身份问题时，调用此工具。
     """
     provider = os.getenv("DEFAULT_PROVIDER", "unknown")
@@ -81,7 +81,7 @@ def get_system_model_info() -> str:
     return f"当前使用的模型提供商(Provider)是: {provider}，具体型号(Model)是: {model}。"
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def read_user_profile() -> str:
     """读取当前完整用户画像，在更新画像前查看已有内容。"""
     if not os.path.exists(PROFILE_PATH):
@@ -89,7 +89,7 @@ def read_user_profile() -> str:
     with open(PROFILE_PATH, "r", encoding="utf-8") as stream:
         return stream.read()
 
-@cyberclaw_tool
+@nanoclaw_tool
 def save_user_profile(new_content: str) -> str:
     """
     更新用户的全局显性记忆档案。
@@ -106,7 +106,7 @@ def save_user_profile(new_content: str) -> str:
     return "记忆档案已成功覆写更新。新的人设画像已生效。"
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def get_current_time() -> str:
     """
     获取当前的系统时间和日期。
@@ -116,7 +116,7 @@ def get_current_time() -> str:
     return f"当前本地系统时间是: {now.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def calculator(expression: str) -> str:
     """
     一个简单的数学计算器。
@@ -130,7 +130,7 @@ def calculator(expression: str) -> str:
         return f"计算出错，请检查表达式格式。错误信息: {str(e)}"
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def schedule_task(target_time: str, description: str, repeat: str | None = None, repeat_count: int | None = None) -> str:
     """
     为一个未来的任务设定闹钟或提醒。
@@ -202,7 +202,7 @@ def schedule_task(target_time: str, description: str, repeat: str | None = None,
     return msg
 
 
-@cyberclaw_tool
+@nanoclaw_tool
 def list_scheduled_tasks() -> str:
     """
     查看当前所有待处理的定时任务列表。
@@ -232,7 +232,7 @@ def list_scheduled_tasks() -> str:
             return f"查询失败：{str(e)}"
     
 
-@cyberclaw_tool
+@nanoclaw_tool
 def delete_scheduled_task(task_id: str) -> str:
     """
     根据任务 ID 取消或删除一个定时任务。
@@ -271,7 +271,7 @@ def delete_scheduled_task(task_id: str) -> str:
             return f"操作异常：{str(e)}"
     
 
-@cyberclaw_tool
+@nanoclaw_tool
 def modify_scheduled_task(task_id: str, new_time: str | None = None, new_description: str | None = None) -> str:
     """
     修改现有定时任务的时间或内容。

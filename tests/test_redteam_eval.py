@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from cyberclaw.core.tools.builtins import calculator
+from nanoclaw.core.tools.builtins import calculator
 
 
 # 注入攻击向量:必须在任何结果输出中被拒绝

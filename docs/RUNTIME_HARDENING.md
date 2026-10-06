@@ -19,7 +19,7 @@ run 均返回权限拒绝，执行器不会被调用。并发重用同一个凭�
 
 ~~~python
 import re
-from cyberclaw.core.skill_loader import load_dynamic_skills
+from nanoclaw.core.skill_loader import load_dynamic_skills
 
 tool = load_dynamic_skills()[0]
 config = {"configurable": {"thread_id": "my-session"}}
@@ -92,8 +92,8 @@ Ubuntu-24.04 / WSL2，Python 3.12.3；沿用用户现有 LangGraph 1.1.6、
 langchain-core 1.2.26、Pydantic 2.12.5 和 SQLite checkpoint 3.0.3。
 
 ~~~bash
-CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
-CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
+NANOCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
+NANOCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
 ~~~
 
 本次本地回归覆盖真实图中的 ToolNode 和同步/异步 Agent Loop，模型和 Shell 使用替身，

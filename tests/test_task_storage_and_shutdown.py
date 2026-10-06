@@ -6,10 +6,10 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from cyberclaw.core.task_storage import write_tasks_atomic
-from cyberclaw.core.bus import stop_workers
-from cyberclaw.core.tools import builtins
-import cyberclaw.core.heartbeat as heartbeat
+from nanoclaw.core.task_storage import write_tasks_atomic
+from nanoclaw.core.bus import stop_workers
+from nanoclaw.core.tools import builtins
+import nanoclaw.core.heartbeat as heartbeat
 
 class AtomicTaskTests(unittest.TestCase):
     def setUp(self):
@@ -24,7 +24,7 @@ class AtomicTaskTests(unittest.TestCase):
         self.assertEqual(len(list(self.path.parent.iterdir())), 1)
 
     def test_replace_failure_keeps_previous_file(self):
-        with patch("cyberclaw.core.task_storage.os.replace", side_effect=OSError("disk error")):
+        with patch("nanoclaw.core.task_storage.os.replace", side_effect=OSError("disk error")):
             with self.assertRaises(OSError):
                 write_tasks_atomic(self.path, [{"id": "new"}])
         self.assertEqual(json.loads(self.path.read_text()), [{"id": "original"}])

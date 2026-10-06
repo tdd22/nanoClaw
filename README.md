@@ -1,14 +1,14 @@
 <div align="center">
 
-![CyberClaw Logo](docs/cyber_logo.png)
+![NanoClaw Logo](docs/cyber_logo.png)
 
-# CyberClaw
+# NanoClaw
 
 **基于 LangGraph 的通用智能体：可观察的决策、可扩展的技能、执行前的协议校验**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](setup.py)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/ttguy0707/CyberClaw)](https://github.com/ttguy0707/CyberClaw/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/tdd22/nanoClaw)](https://github.com/tdd22/nanoClaw/stargazers)
 
 [中文](#中文) · [English](#english)
 
@@ -18,7 +18,7 @@
 
 ## 项目概述
 
-CyberClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Python 和 LangGraph 实现通用智能体工作流。项目围绕“模型决策 → 工具行动 → 结果观察”构建状态图，提供 SQLite 会话持久化、用户画像、上下文摘要、动态技能、定时任务、子 Agent 委派和结构化行为日志。
+NanoClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Python 和 LangGraph 实现通用智能体工作流。项目围绕“模型决策 → 工具行动 → 结果观察”构建状态图，提供 SQLite 会话持久化、用户画像、上下文摘要、动态技能、定时任务、子 Agent 委派和结构化行为日志。
 
 核心设计是 **help → run 两段式技能调用**：模型先获取技能说明，再决定执行或更换技能。当前版本在动态技能执行端加入一次性凭据校验，让调用顺序由代码落实。项目是单机 CLI 应用；OpenClaw 的产品理念与 SKILL.md 约定是参考来源，不代表对其 Node.js 代码的逐模块迁移或功能完全对等。
 
@@ -27,13 +27,13 @@ CyberClaw 受 [OpenClaw](https://github.com/openclaw/openclaw) 启发，以 Pyth
 需要 Python 3.10+。以下命令适用于 Linux / WSL2：
 
 ~~~bash
-git clone https://github.com/ttguy0707/CyberClaw.git
-cd CyberClaw
+git clone https://github.com/tdd22/nanoClaw.git
+cd nanoClaw
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-cyberclaw config
-cyberclaw run
+nanoclaw config
+nanoclaw run
 ~~~
 
 Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。实际可用命令取决于宿主系统。
@@ -42,8 +42,8 @@ Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。�
 
 - OpenAI 兼容接口使用 OPENAI_API_KEY 和可选的 OPENAI_API_BASE。
 - Anthropic 分支需要额外安装 langchain-anthropic；Ollama 分支需要 langchain-community，并启动本地模型服务。这些可选分支尚未在本次回归中进行真实 API 验证。
-- 默认数据目录为项目下 workspace；部署时可通过 CYBERCLAW_WORKSPACE 指向自己的可写目录。
-- 在另一个终端运行 cyberclaw monitor 查看当前 CLI 会话的日志。
+- 默认数据目录为项目下 workspace；部署时可通过 NANOCLAW_WORKSPACE 指向自己的可写目录。
+- 在另一个终端运行 nanoclaw monitor 查看当前 CLI 会话的日志。
 - 输入 /exit 结束 CLI；心跳任务也随主进程停止。
 
 ![聊天界面](docs/chat.png)
@@ -55,9 +55,11 @@ Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。�
 | 状态图工作流 | START → agent → tools → agent；模型不再返回 tool_calls 时结束本次请求 |
 | 会话持久化 | CLI 使用 AsyncSqliteSaver 保存 messages 和 summary，通过 thread_id 关联会话 |
 | 上下文压缩 | 按 HumanMessage 开始的完整回合裁剪；主调用达到 40 回合后保留最近 10 回合，并让 LLM 合并旧摘要 |
+| 会话原文 | 每次 nanoclaw run 生成一个 session_id，把用户、模型和工具消息全文同步写入 workspace/sessions/<session_id>.jsonl。压缩删消息之前先落盘 |
+| 摘要回查 | 摘要缺少回答所需细节时，主 Agent 委派 session_researcher，在主对话之外检索本线程原文并整理后交回 |
 | 长期记忆 | Markdown 用户画像，支持读取及主动更新；每次模型决策注入画像 |
 | 动态技能 | 扫描 office/skills 下的 SKILL.md 或 README.md，按需读取完整说明，执行前校验 help 凭据 |
-| 子 Agent 委派 | 主 Agent 通过 delegate_task 调用代码审查/文档整理子 Agent，独立上下文、只读默认工具、预算与审计关联 |
+| 子 Agent 委派 | 主 Agent 通过 delegate_task 调用代码审查、文档整理或会话回查子 Agent；子任务使用独立上下文，并受预算与审计约束 |
 | 行为日志 | 5 类 JSONL 事件，后台线程写盘，Rich 终端监控 |
 | 定时任务 | 同进程心跳协程每 10 秒检查 tasks.json，支持一次性及 hourly/daily/weekly/monthly 规则 |
 | 模型适配 | 模型工厂封装 OpenAI 兼容接口及 Anthropic、Ollama 分支 |
@@ -80,7 +82,7 @@ SQLite checkpoint 保存可恢复的图状态；它不提供外部工具副作�
 
 ~~~python
 import re
-from cyberclaw.core.skill_loader import load_dynamic_skills
+from nanoclaw.core.skill_loader import load_dynamic_skills
 
 # 先安装至少一个技能到 workspace/office/skills/<技能名>/
 skill = load_dynamic_skills()[0]
@@ -101,14 +103,15 @@ CLI 中由模型从工具结果读取凭据并填入下一次调用。升级后�
 
 ## Subagents：让主 Agent 委派子任务
 
-默认 CLI 注册 delegate_task。主 Agent 可以使用以下两个预设角色，也可以按任务临时定义新的子 Agent，等待结果后汇总：
+默认 CLI 注册 delegate_task。主 Agent 可以使用以下预设角色，也可以按任务临时定义新的子 Agent，等待结果后汇总：
 
 | 角色 | 用途 | 默认权限 |
 | --- | --- | --- |
 | code_reviewer | 代码阅读、缺陷分析、测试建议 | 列目录、读文件 |
 | document_analyst | 资料提炼、比较、文档草稿 | 列目录、读文件 |
+| session_researcher | 摘要缺细节时，检索本线程已落盘的会话原文并整理交回 | 仅 search_session_transcript，不能指定路径，也不能读其他线程 |
 
-先将资料放在 workspace/office/ 下，再启动 cyberclaw run，例如：
+先将资料放在 workspace/office/ 下，再启动 nanoclaw run，例如：
 
 > 请让 code_reviewer 检查 project/heartbeat.py 的恢复逻辑，再由你汇总问题。
 
@@ -177,13 +180,13 @@ SKILL.md 可以包含 name、description 元数据及操作说明。命令中的
 - 正常关闭会停止接收事件并排空队列，重复 shutdown 不会再次等待已退出线程。
 
 ~~~bash
-cyberclaw monitor
+nanoclaw monitor
 tail -f logs/local_geek_master.jsonl
 ~~~
 
 ![监控界面](docs/monitor.png)
 
-这是用于观察和排查的本地结构化日志。输入未保存完整 prompt，结果有截断，崩溃或队列满可能丢事件；不能据此宣称“100% 可追溯”或完整回放。monitor 默认读取 CLI 固定会话日志，其他 thread_id 的文件需单独查看。
+这是用于观察和排查的本地结构化日志。输入未保存完整 prompt，结果有截断，崩溃或队列满可能丢事件。可回放的对话原文在 workspace/sessions/，不在这份审计日志里。monitor 默认读取 CLI 固定会话日志，其他 thread_id 的文件需单独查看。
 
 ## 执行与可靠性边界
 
@@ -214,8 +217,8 @@ tail -f logs/local_geek_master.jsonl
 确定性测试不调用真实模型，建议使用临时工作区：
 
 ~~~bash
-CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
-CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
+NANOCLAW_WORKSPACE="$(mktemp -d)" python3 -m unittest discover -s tests
+NANOCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
 ~~~
 
 2026-09-09 在 Ubuntu-24.04 / WSL2、Python 3.12.3 环境中：**130 项 unittest 通过**，独立懒加载脚本通过，wheel 隔离构建、安装并从仓库外导入成功。测试覆盖真实 ToolNode 及同步/异步图循环，模型与执行器使用替身；这不代表各模型提供商的端到端验收或代码覆盖率。
@@ -230,9 +233,10 @@ CYBERCLAW_WORKSPACE="$(mktemp -d)" python3 tests/test_lazy_loader.py
 ## 项目结构
 
 ~~~text
-CyberClaw/
-├── cyberclaw/core/
-│   ├── agent.py          # 组装图、模型节点、摘要与审计埋点
+NanoClaw/
+├── nanoclaw/core/
+│   ├── agent.py          # 组装图、模型节点、摘要、会话原文与审计埋点
+│   ├── session_log.py    # 按 session_id 追加的会话原文，以及线程内关键词检索
 │   ├── context.py        # AgentState、消息 reducer、完整回合裁剪
 │   ├── skill_loader.py   # 技能发现、说明缓存、help 凭据与 run 校验
 │   ├── subagents.py      # 子 Agent 注册、独立子图、预算、委派工具与审计
@@ -265,7 +269,7 @@ CyberClaw/
 
 ## English
 
-CyberClaw is a Python / LangGraph CLI agent inspired by OpenClaw. It combines a model/tool state graph, SQLite checkpoints, Markdown profiles, context summaries, pluggable skills, scheduled tasks and structured event logs.
+NanoClaw is a Python / LangGraph CLI agent inspired by OpenClaw. It combines a model/tool state graph, SQLite checkpoints, Markdown profiles, context summaries, pluggable skills, scheduled tasks and structured event logs.
 
 ### Getting started
 
@@ -273,10 +277,10 @@ Use Python 3.10+, clone the repository, create a virtual environment and run:
 
 ~~~bash
 python -m pip install -e .
-cyberclaw config
-cyberclaw run
+nanoclaw config
+nanoclaw run
 # In another terminal:
-cyberclaw monitor
+nanoclaw monitor
 ~~~
 
 Configure the selected provider and its credentials using the wizard or .env.example. Anthropic and Ollama adapters require additional langchain-anthropic and langchain-community packages respectively. Actual provider API compatibility was not tested in this regression run.
@@ -289,7 +293,7 @@ This proves that the session received the manual version, not that the model und
 
 ### Subagents
 
-The default CLI exposes delegate_task with code_reviewer and document_analyst presets, both limited to listing/reading office files. The main agent can also define a temporary role with a new agent_name, instructions and selected tool_names. The host validates the tool allowlist; an empty selection means text-only analysis. Dynamic definitions are invocation-local and cannot override presets. Models and execution budgets remain host-controlled. Each invocation starts with a fresh context and execution thread ID; it receives only the explicit task/context, does not inherit the parent checkpoint or global profile, and cannot delegate again.
+The default CLI exposes delegate_task with code_reviewer, document_analyst, and session_researcher. The first two only list and read office files. session_researcher searches the current thread's saved transcript when a summary is missing a detail, then returns an organized result to the parent. The main agent can also define a temporary role with a new agent_name, instructions and selected tool_names. Temporary roles cannot request the transcript search. The host validates the tool allowlist; an empty selection means text-only analysis. Dynamic definitions are invocation-local and cannot override presets. Models and execution budgets remain host-controlled. Each invocation starts with a fresh context and execution thread ID; it receives only the explicit task/context, does not inherit the parent checkpoint or global profile, and cannot delegate again.
 
 The parent waits for a JSON result and checks its status. Defaults: 2 admitted graph calls per app, 120 seconds, 16 graph steps and 6000 result characters. Cancellation is cooperative and cannot forcibly stop running synchronous tools or remote requests. Child graphs are not persisted or resumed after a restart.
 
@@ -297,7 +301,7 @@ Child events stay in the parent's log file with run_id, parent_run_id, agent_nam
 
 ### Current behavior and limits
 
-- The main agent trims at 40 user turns, keeps the latest 10 and merges older content into an LLM summary.
+- The main agent trims at 40 user turns, keeps the latest 10 and merges older content into an LLM summary. Each nanoclaw run writes a full transcript to workspace/sessions/<session_id>.jsonl before those turns are removed.
 - AsyncSqliteSaver persists graph state. The global Markdown profile is not isolated by user.
 - Five event types are logged through a bounded queue. Truncation, drops and crashes prevent a claim of complete audit delivery.
 - Heartbeat runs every 10 seconds in the CLI process. It stops when the CLI exits.
@@ -317,4 +321,4 @@ Historical materials reported 10/20 versus 18/20 safe hits, an increase of 40 pe
 
 本项目采用 [MIT License](LICENSE)。感谢 OpenClaw、LangGraph、LangChain、Rich 及项目贡献者。
 
-[![Star History](https://star-history.dera.page/svg?repos=ttguy0707/CyberClaw&type=Date)](https://star-history.dera.page/#ttguy0707/CyberClaw&Date)
+[![Star History](https://star-history.dera.page/svg?repos=tdd22/nanoClaw&type=Date)](https://star-history.dera.page/#tdd22/nanoClaw&Date)

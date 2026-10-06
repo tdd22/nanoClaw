@@ -10,14 +10,14 @@ def parse_requirements(filename):
         ]
 
 setup(
-    name="cyberclaw",
+    name="nanoclaw",
     version="1.0.0",
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=parse_requirements('requirements.txt'),
     entry_points={
         "console_scripts": [
-            "cyberclaw=entry.cli:main",
+            "nanoclaw=entry.cli:main",
         ],
     },
 )

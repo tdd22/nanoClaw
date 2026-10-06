@@ -1,6 +1,6 @@
 import os
 import subprocess
-from .base import cyberclaw_tool
+from .base import nanoclaw_tool
 from ..config import OFFICE_DIR
 from ..logger import audit_logger
 import re
@@ -64,16 +64,16 @@ _REDIRECTION_TARGET_PATTERN = re.compile(r"[<>]{1,2}\s*([^\s;|&]+)")
 
 def _load_extended_commands():
     """
-    读取环境变量追加的白名单命令（CYBERCLAW_ALLOWED_COMMANDS，逗号分隔）。
+    读取环境变量追加的白名单命令（NANOCLAW_ALLOWED_COMMANDS，逗号分隔）。
     首次读取到非空扩展时记审计日志——扩展白名单是一次显式的人工授权，必须留痕。
     """
-    raw = os.getenv("CYBERCLAW_ALLOWED_COMMANDS", "")
+    raw = os.getenv("NANOCLAW_ALLOWED_COMMANDS", "")
     extended = {c.strip().lower() for c in raw.split(",") if c.strip()}
     if extended:
         audit_logger.log_event(
             thread_id="system",
             event="system_action",
-            content=f"shell 白名单扩展生效（CYBERCLAW_ALLOWED_COMMANDS）: {sorted(extended)}"
+            content=f"shell 白名单扩展生效（NANOCLAW_ALLOWED_COMMANDS）: {sorted(extended)}"
         )
     return extended
 
@@ -144,7 +144,7 @@ def _validate_segment(segment: str):
     if head_name.lower() not in _ALLOWED_COMMANDS:
         raise PermissionError(
             f"命令 '{head_name}' 不在允许清单内。office 沙盒仅放行白名单命令；"
-            f"如需扩展，请设置 CYBERCLAW_ALLOWED_COMMANDS 环境变量。"
+            f"如需扩展，请设置 NANOCLAW_ALLOWED_COMMANDS 环境变量。"
         )
 
     if head_name.lower() in _INTERPRETERS:
@@ -202,7 +202,7 @@ def _validate_command(command: str):
         if stripped:
             _validate_segment(stripped)
 
-@cyberclaw_tool
+@nanoclaw_tool
 def list_office_files(sub_dir: str = "") -> str:
     """
     查看你的 office 工位里有哪些文件和文件夹。
@@ -228,7 +228,7 @@ def list_office_files(sub_dir: str = "") -> str:
     except Exception as e:
         return str(e)
     
-@cyberclaw_tool
+@nanoclaw_tool
 def read_office_file(filepath: str) -> str:
     """
     读取 office 工位里指定文件的内容。
@@ -248,7 +248,7 @@ def read_office_file(filepath: str) -> str:
     except Exception as e:
         return str(e)
     
-@cyberclaw_tool
+@nanoclaw_tool
 def write_office_file(filepath: str, content: str, mode: str = "w") -> str:
     """
     在 office 工位里操作文件内容。
@@ -288,7 +288,7 @@ def write_office_file(filepath: str, content: str, mode: str = "w") -> str:
         return str(e)
     
 
-@cyberclaw_tool
+@nanoclaw_tool
 def execute_office_shell(command: str) -> str:
     """
     在 office 工位中执行 Shell 命令（结构化命令白名单管控）。
@@ -303,7 +303,7 @@ def execute_office_shell(command: str) -> str:
     7. 非交互式终端：所有命令必须携带免确认参数（如 -y, --quiet）。
     8. [无状态警告] 每次执行都是独立的终端进程！需要进入子目录请使用"命令链"或相对路径。
 
-    如需运行白名单外的命令，部署者可设置环境变量 CYBERCLAW_ALLOWED_COMMANDS（逗号分隔）扩展白名单，扩展生效会记入审计日志。
+    如需运行白名单外的命令，部署者可设置环境变量 NANOCLAW_ALLOWED_COMMANDS（逗号分隔）扩展白名单，扩展生效会记入审计日志。
     """
     try:
         try:

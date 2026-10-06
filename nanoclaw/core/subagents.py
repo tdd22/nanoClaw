@@ -1,8 +1,10 @@
 """Bounded, tool-based subagents with fresh graph state per invocation.
 
-Defaults only read office files. This is cooperative in-process execution, not
-a background job service or an OS sandbox. Cancelling a graph does not forcibly
-stop synchronous tools already running in a worker thread.
+Office presets only read office files. session_researcher only searches the
+current thread's saved transcript. This is cooperative in-process execution,
+not a background job service or an OS sandbox: the parent waits for the
+organized result. Cancelling a graph does not forcibly stop synchronous tools
+already running in a worker thread.
 """
 import asyncio
 from dataclasses import dataclass
@@ -25,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .context import AgentState
 from .logger import audit_logger
 from .provider import get_provider
+from .session_log import search_session_transcript_tool
 from .tools.sandbox_tools import list_office_files, read_office_file
 
 
@@ -85,6 +88,14 @@ def default_subagents() -> tuple[SubagentSpec, ...]:
             "document_analyst", "阅读 office 内资料，提炼要点、比较信息并整理文档草稿；不写文件。",
             "你负责文档分析。根据任务读取必要资料，返回清晰的要点或草稿，并标注来源路径。"
             "发现信息缺失或相互矛盾时明确指出。", readonly),
+        SubagentSpec(
+            "session_researcher", "当摘要缺少细节时，检索本线程已落盘的会话原文并整理后交回主 Agent。",
+            "你负责从本线程已经落盘的会话原文中找回摘要没有写清的细节。"
+            "只使用 search_session_transcript。query 使用原文里可能出现的短关键词，可以多次检索。"
+            "不要请求文件路径，也不要尝试读取其他资料。"
+            "按任务整理：结论、原文依据（session_id 与 message_id）、仍然缺失的部分。"
+            "不要编造原文里没有的内容。",
+            (search_session_transcript_tool,)),
     )
 
 
@@ -246,10 +257,13 @@ class SubagentRunner:
                  timeout_seconds=self.timeout_seconds, max_steps=self.max_steps,
                  tools=[tool.name for tool in selected_spec.tools])
             # Construct a fresh config: never forward parent checkpoint IDs,
-            # internal Pregel keys, profile state, or the parent's thread ID.
+            # internal Pregel keys, or profile state. transcript_thread_id is a
+            # host-owned scope for session_researcher; the model cannot set it.
+            # The child thread_id stays separate so parent skill grants do not apply.
             child_config = {
                 "configurable": {"thread_id": child_thread, "run_id": run_id,
-                                 "parent_run_id": parent_run_id, "subagent_depth": 1},
+                                 "parent_run_id": parent_run_id, "subagent_depth": 1,
+                                 "transcript_thread_id": str(thread_id)},
                 "recursion_limit": self.max_steps,
                 "metadata": {"agent_name": args.agent_name, "run_id": run_id,
                              "parent_run_id": parent_run_id},

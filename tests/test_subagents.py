@@ -11,8 +11,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from pydantic import ValidationError
 
-import cyberclaw.core.subagents as sub
-from cyberclaw.core.agent import create_agent_app
+import nanoclaw.core.subagents as sub
+from nanoclaw.core.agent import create_agent_app
 
 
 @tool
@@ -53,8 +53,11 @@ CONFIG = {"configurable": {"thread_id": "parent-session", "run_id": "parent-run"
 
 class RegistryTests(unittest.TestCase):
     def test_default_roles_only_have_read_tools(self):
-        for role in sub.default_subagents():
-            self.assertEqual({t.name for t in role.tools}, {"read_office_file", "list_office_files"})
+        roles = {role.name: {t.name for t in role.tools} for role in sub.default_subagents()}
+        office = {"read_office_file", "list_office_files"}
+        self.assertEqual(roles["code_reviewer"], office)
+        self.assertEqual(roles["document_analyst"], office)
+        self.assertEqual(roles["session_researcher"], {"search_session_transcript"})
 
     def test_no_duplicate_roles_or_recursive_delegation_tools(self):
         with self.assertRaises(ValueError):
@@ -249,7 +252,7 @@ class SubagentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len({c["configurable"]["thread_id"] for _, c in self.model.calls}), 2)
 
     async def test_default_role_reads_office_file_but_cannot_write(self):
-        from cyberclaw.core.tools import sandbox_tools
+        from nanoclaw.core.tools import sandbox_tools
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root/"notes.txt").write_text("fixture evidence", encoding="utf-8")
@@ -269,8 +272,47 @@ class SubagentTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["status"], "completed")
             self.assertFalse((root/"forbidden.txt").exists())
 
+    async def test_session_researcher_returns_transcript_detail_to_parent(self):
+        import nanoclaw.core.session_log as session_log
+        with tempfile.TemporaryDirectory() as d:
+            log = session_log.SessionTranscript(d)
+            log.append_messages("sess-a", "parent-session", [
+                HumanMessage(content="服务端口当时改成了 8841", id="h1"),
+                AIMessage(content="已按 8841 继续配置", id="a1"),
+            ])
+            log.append_messages("sess-b", "thread-2", [
+                HumanMessage(content="另一条线程的端口是 8841", id="other"),
+            ])
+
+            def flow(messages, config):
+                results = [m for m in messages if m.type == "tool"]
+                if not results:
+                    self.assertEqual(config["configurable"]["transcript_thread_id"], "parent-session")
+                    self.assertNotEqual(config["configurable"]["thread_id"], "parent-session")
+                    return call("search_session_transcript", {"query": "8841"}, "search")
+                self.assertIn("message_id=h1", results[-1].content)
+                self.assertNotIn("另一条线程", results[-1].content)
+                return AIMessage(content="端口是 8841。依据 message_id=h1。")
+
+            self.model.fn = flow
+            with patch.object(session_log, "session_transcript", log):
+                result = json.loads(await sub.SubagentRunner().arun(
+                    "session_researcher", "找回摘要里没写的端口号",
+                    context="摘要只说改过端口", config=CONFIG))
+        self.assertEqual(result["status"], "completed")
+        self.assertIn("8841", result["result"])
+        self.assertEqual(result["agent_name"], "session_researcher")
+
+    async def test_dynamic_role_cannot_search_the_transcript(self):
+        result = json.loads(await sub.SubagentRunner().arun(
+            "snooper", "read logs", config=CONFIG,
+            instructions="Read the saved transcript.",
+            tool_names=["search_session_transcript"]))
+        self.assertEqual(result["status"], "rejected")
+        self.provider.assert_not_called()
+
     async def test_parent_skill_token_cannot_authorize_child(self):
-        import cyberclaw.core.skill_loader as skills
+        import nanoclaw.core.skill_loader as skills
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             folder = root/"demo"; folder.mkdir()
@@ -307,7 +349,7 @@ class ParentIntegrationTests(unittest.TestCase):
         self.child = Model()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        patch("cyberclaw.core.agent.MEMORY_DIR", self.tmp.name).start()
+        patch("nanoclaw.core.agent.MEMORY_DIR", self.tmp.name).start()
         patch.object(sub, "get_provider", return_value=self.child).start()
         self.audit = patch.object(sub, "audit_logger").start()
         self.addCleanup(patch.stopall)
@@ -325,7 +367,7 @@ class ParentIntegrationTests(unittest.TestCase):
                 return call("delegate_task", {"agent_name": "reader", "task": "only this",
                                               "context": "explicit context"})
         parent = Parent()
-        with patch("cyberclaw.core.agent.get_provider", return_value=parent):
+        with patch("nanoclaw.core.agent.get_provider", return_value=parent):
             app = create_agent_app(tools=[], subagent_specs=[spec()])
             for async_mode in (False, True):
                 inputs = {"messages": [HumanMessage(content="PRIVATE HISTORY NOT FORWARDED")]}
@@ -340,7 +382,7 @@ class ParentIntegrationTests(unittest.TestCase):
     def test_explicit_tool_list_preserved_unless_enabled(self):
         parent = MagicMock()
         parent.bind_tools.return_value = parent
-        with patch("cyberclaw.core.agent.get_provider", return_value=parent):
+        with patch("nanoclaw.core.agent.get_provider", return_value=parent):
             create_agent_app(tools=[lookup])
             self.assertEqual([t.name for t in parent.bind_tools.call_args.args[0]], ["lookup"])
             create_agent_app(tools=[lookup], enable_subagents=True)
@@ -351,8 +393,8 @@ class ParentIntegrationTests(unittest.TestCase):
     def test_default_cli_registers_delegation_without_eager_child_model(self):
         parent = MagicMock()
         parent.bind_tools.return_value = parent
-        with patch("cyberclaw.core.agent.get_provider", return_value=parent), \
-             patch("cyberclaw.core.agent.load_dynamic_skills", return_value=[]):
+        with patch("nanoclaw.core.agent.get_provider", return_value=parent), \
+             patch("nanoclaw.core.agent.load_dynamic_skills", return_value=[]):
             create_agent_app()
         self.assertIn("delegate_task", [t.name for t in parent.bind_tools.call_args.args[0]])
         sub.get_provider.assert_not_called()
@@ -513,8 +555,8 @@ class DynamicParentTests(unittest.TestCase):
                     "tool_names": ["lookup"],
                 })
         with tempfile.TemporaryDirectory() as d, \
-             patch("cyberclaw.core.agent.MEMORY_DIR", d), \
-             patch("cyberclaw.core.agent.get_provider", return_value=Parent()), \
+             patch("nanoclaw.core.agent.MEMORY_DIR", d), \
+             patch("nanoclaw.core.agent.get_provider", return_value=Parent()), \
              patch.object(sub, "get_provider", return_value=child), \
              patch.object(sub, "audit_logger"):
             app = create_agent_app(tools=[], enable_subagents=True, dynamic_subagent_tools=[lookup])

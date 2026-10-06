@@ -1,10 +1,10 @@
 # Subagents：子任务委派
 
-CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。子任务使用自己的模型/工具循环，只返回最终结果给主 Agent；主 Agent 等待并负责汇总。它不是后台作业服务，不会在 CLI 退出后继续执行。
+NanoClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。子任务使用自己的模型/工具循环，只返回最终结果给主 Agent；主 Agent 等待并负责汇总。它不是后台作业服务，不会在 CLI 退出后继续执行。
 
 ## CLI 用法
 
-更新源码并重启 cyberclaw run。默认提供两种预设角色，主 Agent 也可以临时定义其他角色：
+更新源码并重启 nanoclaw run。默认提供两种预设角色，主 Agent 也可以临时定义其他角色：
 
 | 名称 | 作用 | 默认工具 |
 | --- | --- | --- |
@@ -48,8 +48,8 @@ CyberClaw 的主 Agent 现在可以通过 delegate_task 调用独立子 Agent。
 SDK 宿主可控制这项能力：
 
 ~~~python
-from cyberclaw.core.agent import create_agent_app
-from cyberclaw.core.tools.sandbox_tools import read_office_file
+from nanoclaw.core.agent import create_agent_app
+from nanoclaw.core.tools.sandbox_tools import read_office_file
 
 # 保留预设角色，但关闭主 Agent 临时定义角色。
 presets_only = create_agent_app(allow_dynamic_subagents=False)
@@ -113,9 +113,9 @@ status 可能为 completed、rejected、busy、timeout、step_limit 或 failed�
 ~~~python
 from uuid import uuid4
 from langchain_core.messages import HumanMessage
-from cyberclaw.core.agent import create_agent_app
-from cyberclaw.core.subagents import SubagentSpec
-from cyberclaw.core.tools.sandbox_tools import read_office_file
+from nanoclaw.core.agent import create_agent_app
+from nanoclaw.core.subagents import SubagentSpec
+from nanoclaw.core.tools.sandbox_tools import read_office_file
 
 reviewer = SubagentSpec(
     name="reviewer",
@@ -144,7 +144,7 @@ print(result["messages"][-1].content)
 ~~~python
 import asyncio
 from uuid import uuid4
-from cyberclaw.core.subagents import SubagentRunner
+from nanoclaw.core.subagents import SubagentRunner
 
 runner = SubagentRunner(
     provider_name="openai",
