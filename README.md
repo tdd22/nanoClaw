@@ -1,6 +1,6 @@
 <div align="center">
 
-![NanoClaw Logo](docs/cyber_logo.png)
+
 
 # NanoClaw
 
@@ -46,7 +46,7 @@ Windows PowerShell 激活虚拟环境时使用 .\.venv\Scripts\Activate.ps1。�
 - 在另一个终端运行 nanoclaw monitor 查看当前 CLI 会话的日志。
 - 输入 /exit 结束 CLI；心跳任务也随主进程停止。
 
-![聊天界面](docs/chat.png)
+
 
 ## 核心能力与当前实现
 
@@ -184,9 +184,7 @@ nanoclaw monitor
 tail -f logs/local_geek_master.jsonl
 ~~~
 
-![监控界面](docs/monitor.png)
 
-这是用于观察和排查的本地结构化日志。输入未保存完整 prompt，结果有截断，崩溃或队列满可能丢事件。可回放的对话原文在 workspace/sessions/，不在这份审计日志里。monitor 默认读取 CLI 固定会话日志，其他 thread_id 的文件需单独查看。
 
 ## 执行与可靠性边界
 
